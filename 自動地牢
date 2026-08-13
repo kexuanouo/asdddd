@@ -1,0 +1,852 @@
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualUser = game:GetService("VirtualUser")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local hrp = character:WaitForChild("HumanoidRootPart")
+local humanoid = character:WaitForChild("Humanoid")
+
+-- 防掛機剔除
+player.Idled:Connect(function()
+    VirtualUser:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+    task.wait(1)
+    VirtualUser:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+end)
+
+-- ━━━━━━━━━━━━━━━━━━━━━━ 核心設定 ━━━━━━━━━━━━━━━━━━━━━━
+local CONFIG = {
+    CheckInterval = 0.5,
+    TweenSpeed = 300,        -- 飛行速度
+    AboveMonsterOffset = 30, -- 飛在怪頭上的高度 offset
+    EnterRoomWaitTime = 2.5  -- 剛飛到下一關時，等待新怪物刷新的時間 (秒)
+}
+
+local Config = {
+    FastAttackMob = false,      -- 控制快速攻擊的開關 (預設關閉)
+    FastAttackPlayer = false,
+    FastAttackDelay = 0,        -- 攻速延遲 (0秒極速)
+    
+    RemoveAnimationFast = true, -- 核心加速：移除攻擊動畫鎖 (預設開啟)
+    DoubleAttack = true,        -- 核心雙倍：每輪攻擊打 2 下 (預設開啟)
+    
+    BypassFastAttack = true,
+    AttackRange = 380,          -- 攻擊範圍
+    HealthMobThreshold = 0,     -- 怪物血量門檻
+    FruitM1WithSword = true,    -- 開開啟拿刀觸發果實 M1
+    FruitM1Aura = false,        -- 背包果實光環 (預設關閉)
+    ClickDelay = 0.08,          -- 微調發包間隔
+    AutoEquip = true           -- 自動拿武器 (預設開啟)
+}
+
+local State = {
+    AutoFarm = false,        -- 自動飛怪頭上 (預設關閉)
+    AutoBuso = false,        -- 自動武裝色 (預設關閉)
+    AutoV3 = false,          -- 自動 V3 (預設關閉)
+    AutoV4 = false,          -- 自動 V4 (預設關閉)
+    BringMob = false,        -- 聚怪 (預設關閉)
+    LockedLevel = 1,
+    CurrentTarget = nil,
+    StatusText = "待機中"
+}
+
+-- ━━━━━━━━━━━━━━━━━━━━━━ 角色死亡與重生自動更新 ━━━━━━━━━━━━━━━━━━━━━━
+local bv = nil
+
+local function getRef()
+    character = player.Character
+    if character then
+        hrp = character:FindFirstChild("HumanoidRootPart")
+        humanoid = character:WaitForChild("Humanoid")
+    else
+        hrp = nil
+        humanoid = nil
+    end
+end
+
+player.CharacterAdded:Connect(function(newChar)
+    character = newChar
+    hrp = character:WaitForChild("HumanoidRootPart")
+    humanoid = character:WaitForChild("Humanoid")
+    if bv then
+        bv:Destroy()
+        bv = nil
+    end
+end)
+
+-- 自動裝備身上的第一把武器
+local function autoEquipWeapon()
+    if not Config.AutoEquip or not character or not humanoid then return end
+    if not character:FindFirstChildOfClass("Tool") then
+        local backpack = player:FindFirstChild("Backpack")
+        if backpack then
+            for _, tool in ipairs(backpack:GetChildren()) do
+                if tool:IsA("Tool") then
+                    local wType = tool:GetAttribute("WeaponType")
+                    if wType == "Sword" or wType == "Melee" or wType == "Demon Fruit" then
+                        humanoid:EquipTool(tool)
+                        break
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━ 網路 Remote 初始化 ━━━━━━━━━━━━━━━━━━━━━━
+local Net              = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net")
+local RegisterHit      = Net:WaitForChild("RE/RegisterHit")
+local RegisterAttack   = Net:WaitForChild("RE/RegisterAttack")
+local CancelEquipAnim  = Net:FindFirstChild("RE/CancelEquipAnim") or Net:FindFirstChild("RE/RemoveAnimation")
+local LeftClickRemote  = Net:FindFirstChild("RE/LeftClickRemote") or Net:FindFirstChild("RE/FruitClick")
+
+local function isShadow(name)
+    local lower = string.lower(name)
+    return string.find(lower, "shadow") ~= nil
+        or string.find(name, "'s Shadow") ~= nil
+        or string.find(name, "\u{2019}s Shadow") ~= nil
+end
+
+-- 果實 & Guitar 偵測
+local M1Fruit = false
+local Guitar = false
+
+task.spawn(function()
+    while true do
+        task.wait(2)
+        local flagFruit, flagGuitar = false, false
+        local function scanContainer(container)
+            if not container then return end
+            for _, item in ipairs(container:GetChildren()) do
+                if item:IsA("Tool") then
+                    local isChop = string.find(string.lower(item.Name), "chop") ~= nil
+                    if (item:GetAttribute('WeaponType') == 'Demon Fruit' or item.ToolTip == "Blox Fruit") and item:FindFirstChild("LeftClickRemote") and not isChop then
+                        M1Fruit = item
+                        flagFruit = true
+                    elseif item:GetAttribute('WeaponType') == 'Gun' and item.Name == "Skull Guitar" then
+                        Guitar = item
+                        flagGuitar = true
+                    end
+                end
+            end
+        end
+        scanContainer(player.Character)
+        scanContainer(player:FindFirstChild("Backpack"))
+        if not flagFruit then M1Fruit = nil end
+        if not flagGuitar then Guitar = nil end
+    end
+end)
+
+-- Bypass remoteEvent 靜態與動態偵測
+local remoteId = nil
+local remoteEvent = nil
+local Folders = {
+    ReplicatedStorage.Util,
+    ReplicatedStorage.Common,
+    ReplicatedStorage.Remotes,
+    ReplicatedStorage.Assets,
+    ReplicatedStorage.FX,
+}
+for _, Remotes in ipairs(Folders) do
+    pcall(function()
+        for _, remote in ipairs(Remotes:GetChildren()) do
+            if remote:IsA('RemoteEvent') and remote:GetAttribute('Id') then
+                remoteId = remote:GetAttribute('Id')
+                remoteEvent = remote
+            end
+        end
+        Remotes.ChildAdded:Connect(function(add)
+            if add:IsA('RemoteEvent') and add:GetAttribute('Id') then
+                remoteId = add:GetAttribute('Id')
+                remoteEvent = add
+            end
+        end)
+    end)
+end
+
+local DownVec = Vector3.new(0, -1, 0)
+local lastAttackTime = 0
+
+local function generateRegisterHitToken()
+    return tostring(player.UserId):sub(2, 4) .. tostring(coroutine.running()):sub(11, 15)
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━ 融合高階快速攻擊主邏輯 ━━━━━━━━━━━━━━━━━━━━━━
+task.spawn(function()
+    while true do
+        if Config.FastAttackDelay > 0 then
+            task.wait(Config.FastAttackDelay)
+        else
+            local delta = tick() - lastAttackTime
+            if delta < 0.033 then
+                task.wait(0.033 - delta)
+            else
+                task.wait()
+            end
+        end
+
+        if not Config.FastAttackPlayer and not Config.FastAttackMob then continue end
+
+        local Character = player.Character
+        local hrp = Character and Character:FindFirstChild('HumanoidRootPart')
+        if not Character or not hrp then continue end
+
+        local hum = Character:FindFirstChildOfClass("Humanoid")
+        if not hum or hum.Health <= 0 then continue end
+
+        local attackRange = Config.AttackRange or 380
+
+        local BladeHits = {}
+        local MobFolders = { workspace.Enemies, workspace.Characters }
+        for _, Mobs in ipairs(MobFolders) do
+            if not Mobs then continue end
+            if Mobs.Name == "Enemies" and not Config.FastAttackMob then continue end
+            if Mobs.Name == "Characters" and not Config.FastAttackPlayer then continue end
+            for _, Mob in ipairs(Mobs:GetChildren()) do
+                if Mob == Character or not Mob:IsA("Model") or isShadow(Mob.Name) or Mob.Name == "Blank Buddy" then continue end
+                local mobHrp = Mob:FindFirstChild('HumanoidRootPart')
+                local mobHum = Mob:FindFirstChild('Humanoid')
+                if mobHrp and mobHum and mobHum.Health > Config.HealthMobThreshold then
+                    if (mobHrp.Position - hrp.Position).Magnitude <= attackRange then
+                        BladeHits[#BladeHits + 1] = {Mob, mobHrp}
+                    end
+                end
+            end
+        end
+
+        local Tool = Character:FindFirstChildOfClass('Tool')
+
+        if #BladeHits > 0 then
+            local isChop = Tool and string.find(string.lower(Tool.Name), "chop") ~= nil
+            
+            if not Tool or (Tool and (
+                Tool:GetAttribute('WeaponType') == 'Melee' or
+                Tool:GetAttribute('WeaponType') == 'Sword' or
+                isChop or
+                (Tool:GetAttribute('WeaponType') == 'Demon Fruit' and (Tool.Name == "Light-Light" or Tool.Name == "Ice-Ice"))
+            )) then
+                local _Head = BladeHits[1][1]:FindFirstChild('Head') or BladeHits[1][2]
+                if _Head then
+                    lastAttackTime = tick()
+                    local sessionToken = generateRegisterHitToken()
+
+                    pcall(function()
+                        RegisterAttack:FireServer(0.1)
+                        RegisterHit:FireServer(_Head, BladeHits, {}, sessionToken)
+                    end)
+
+                    if Config.FruitM1Aura and LeftClickRemote then
+                        pcall(function() LeftClickRemote:FireServer(_Head.Position) end)
+                    end
+
+                    if Config.RemoveAnimationFast and CancelEquipAnim then
+                        pcall(function() CancelEquipAnim:FireServer() end)
+                    end
+
+                    if Config.DoubleAttack then
+                        pcall(function()
+                            RegisterAttack:FireServer(0.1)
+                            RegisterHit:FireServer(_Head, BladeHits, {}, sessionToken)
+                        end)
+                        if Config.FruitM1Aura and LeftClickRemote then
+                            pcall(function() LeftClickRemote:FireServer(_Head.Position) end)
+                        end
+                        if Config.RemoveAnimationFast and CancelEquipAnim then
+                            pcall(function() CancelEquipAnim:FireServer() end)
+                        end
+                    end
+
+                    if Config.BypassFastAttack and remoteEvent then
+                        task.spawn(function()
+                            pcall(function()
+                                require(ReplicatedStorage.Modules.Net):RemoteEvent('RegisterHit', true)
+                                cloneref(remoteEvent):FireServer(
+                                    string.gsub('RE/RegisterHit', '.', function(p)
+                                        return string.char(bit32.bxor(string.byte(p), math.floor(workspace:GetServerTimeNow() / 10 % 10) + 1))
+                                    end),
+                                    bit32.bxor(remoteId + 909090, ReplicatedStorage.Modules.Net.seed:InvokeServer() * 2),
+                                    _Head, BladeHits
+                                )
+                            end)
+                        end)
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- 果實 M1 光環
+task.spawn(function()
+    while true do
+        task.wait(Config.ClickDelay or 0.08)
+
+        if not Config.FruitM1Aura then continue end
+        if not Config.FastAttackPlayer and not Config.FastAttackMob then continue end
+
+        local Character = player.Character
+        local hrp = Character and Character:FindFirstChild('HumanoidRootPart')
+        if not Character or not hrp then continue end
+        
+        local hum = Character:FindFirstChildOfClass("Humanoid")
+        if not hum or hum.Health <= 0 then continue end
+
+        if not M1Fruit or type(M1Fruit) ~= "userdata" or not M1Fruit.Parent or not M1Fruit:FindFirstChild("LeftClickRemote") then 
+            continue 
+        end
+
+        local closestMob = nil
+        local minDistance = Config.AttackRange or 380
+
+        local MobFolders = { workspace.Enemies, workspace.Characters }
+        for _, Mobs in ipairs(MobFolders) do
+            if not Mobs then continue end
+            if Mobs.Name == "Enemies" and not Config.FastAttackMob then continue end
+            if Mobs.Name == "Characters" and not Config.FastAttackPlayer then continue end
+            
+            for _, Mob in ipairs(Mobs:GetChildren()) do
+                if Mob == Character or not Mob:IsA("Model") or isShadow(Mob.Name) or Mob.Name == "Blank Buddy" then continue end
+                local mobHrp = Mob:FindFirstChild('HumanoidRootPart')
+                local mobHum = Mob:FindFirstChild('Humanoid')
+                if mobHrp and mobHum and mobHum.Health > Config.HealthMobThreshold then
+                    local dist = (mobHrp.Position - hrp.Position).Magnitude
+                    if dist < minDistance then
+                        minDistance = dist
+                        closestMob = Mob
+                    end
+                end
+            end
+        end
+
+        if closestMob then
+            pcall(function()
+                M1Fruit.LeftClickRemote:FireServer(DownVec, 1, true)
+            end)
+        end
+    end
+end)
+
+-- ━━━━━━━━━━━━━━━━━━━━━━ 聚怪邏輯（死鎖 Y 軸防下沉/漂浮 + 物理凍結版） ━━━━━━━━━━━━━━━━━━━━━━
+local BringZero = Vector3.new(0, 0, 0)
+local MonFarm = nil
+local FarmPos = nil
+
+local mobTracker = {}   -- 追蹤怪物的拉取時間與血量
+local mobBlacklist = {} -- 黑名單 (5秒冷卻)
+local spinAngle = 0     -- 用於計算旋轉的角度
+local lockedY = nil     -- 死鎖聚怪平面的 Y 軸高度
+
+local function freezeMobPhysics(model, isBring)
+    for _, part in ipairs(model:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = false
+            part.Velocity = BringZero
+            part.RotVelocity = BringZero
+            pcall(function()
+                part.AssemblyLinearVelocity = BringZero
+                part.AssemblyAngularVelocity = BringZero
+            end)
+        end
+    end
+    
+    local hum = model:FindFirstChildOfClass("Humanoid")
+    if hum then
+        hum.PlatformStand = isBring
+    end
+end
+
+task.spawn(function()
+    while true do
+        task.wait(0.02)
+        local now = tick()
+        spinAngle = (spinAngle + 35) % 360
+
+        for mob, expireTime in pairs(mobBlacklist) do
+            if now > expireTime then
+                mobBlacklist[mob] = nil
+            end
+        end
+
+        if State.AutoFarm and State.BringMob and FarmPos then
+            if not lockedY then
+                lockedY = FarmPos.Position.Y
+            end
+            
+            local fixedCenter = Vector3.new(FarmPos.Position.X, lockedY, FarmPos.Position.Z)
+
+            pcall(function()
+                sethiddenproperty(player, "SimulationRadius", 1000)
+                sethiddenproperty(player, "MaxSimulationRadius", 1000)
+            end)
+
+            local ef = workspace:FindFirstChild("Enemies")
+            if ef then
+                local bringCount = 0
+                for _, v in ipairs(ef:GetChildren()) do
+                    if bringCount >= 10 then break end
+                    if v.Name == "Blank Buddy" or isShadow(v.Name) or mobBlacklist[v] then continue end
+
+                    local root = v:FindFirstChild("HumanoidRootPart") or v.PrimaryPart
+                    local hum  = v:FindFirstChildOfClass("Humanoid")
+
+                    if root and hum and hum.Health > Config.HealthMobThreshold then
+                        local distToCenter = (root.Position - fixedCenter).Magnitude
+
+                        if distToCenter <= 120 then
+                            if not mobTracker[v] then
+                                mobTracker[v] = {
+                                    startTime = now,
+                                    startHealth = hum.Health,
+                                    originalCFrame = root.CFrame
+                                }
+                            end
+
+                            local tracker = mobTracker[v]
+                            local duration = now - tracker.startTime
+
+                            local healthDifference = tracker.startHealth - hum.Health
+                            if duration >= 2.5 and healthDifference <= (hum.MaxHealth * 0.01) then
+                                freezeMobPhysics(v, false)
+                                root.CFrame = tracker.originalCFrame
+
+                                mobBlacklist[v] = now + 5
+                                mobTracker[v] = nil
+                            else
+                                bringCount = bringCount + 1
+                                
+                                freezeMobPhysics(v, true)
+                                
+                                local rad = math.rad(spinAngle + (bringCount * 36))
+                                local offsetX = math.cos(rad) * 0.5
+                                local offsetZ = math.sin(rad) * 0.8
+                                
+                                local baseCFrame = CFrame.new(fixedCenter.X + offsetX, fixedCenter.Y, fixedCenter.Z + offsetZ)
+                                local rotation = CFrame.Angles(0, math.rad(spinAngle), 0) -- 原本的水平旋轉
+                                local upsideDown = CFrame.Angles(math.rad(180), 0, 0)     -- 讓怪物翻轉180度（頭朝下）
+
+root.CFrame = baseCFrame * rotation * upsideDown
+                            end
+                        else
+                            mobTracker[v] = nil
+                        end
+                    else
+                        mobTracker[v] = nil
+                    end
+                end
+            end
+        else
+            lockedY = nil
+            if next(mobTracker) then
+                for mob, _ in pairs(mobTracker) do
+                    if mob and mob.Parent then
+                        freezeMobPhysics(mob, false)
+                    end
+                end
+                mobTracker = {}
+            end
+        end
+    end
+end)
+
+-- ━━━━━━━━━━━━━━━━━━━━━━ 功能邏輯 ━━━━━━━━━━━━━━━━━━━━━━
+local function callV4()
+    if State.AutoV4 then
+        local b = player:FindFirstChild("Backpack")
+        local a = b and b:FindFirstChild("Awakening")
+        local r = a and a:FindFirstChild("RemoteFunction")
+        if r then pcall(function() r:InvokeServer(true) end) end
+    end
+end
+
+local function doBuffs()
+    if not character then return end
+    if State.AutoBuso and not character:FindFirstChild("HasBuso") then
+        pcall(function() ReplicatedStorage.Remotes.CommF_:InvokeServer("Buso") end)
+    end
+    if State.AutoV3 then
+        pcall(function() ReplicatedStorage.Remotes.CommE:FireServer("ActivateAbility") end)
+    end
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━ UI 建立 ━━━━━━━━━━━━━━━━━━━━━━
+local sg = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+sg.Name = "DungeonFastAttackUI"
+sg.ResetOnSpawn = false
+
+local main = Instance.new("Frame", sg)
+main.Size = UDim2.new(0, 270, 0, 560)
+main.Position = UDim2.new(0.5, -135, 0.4, -280)
+main.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+main.Active = true
+Instance.new("UICorner", main)
+
+-- 手動拖動
+local UIS = game:GetService("UserInputService")
+local dragging, dragInput, dragStart, startPos = false, nil, nil, nil
+main.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		dragStart = input.Position
+		startPos = main.Position
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then dragging = false end
+		end)
+	end
+end)
+main.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+		dragInput = input
+	end
+end)
+UIS.InputChanged:Connect(function(input)
+	if input == dragInput and dragging then
+		local delta = input.Position - dragStart
+		main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+	end
+end)
+
+local bar = Instance.new("TextLabel", main)
+bar.Size = UDim2.new(1, 0, 0, 45)
+bar.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+bar.Text = "  自動地牢選單"
+bar.TextColor3 = Color3.new(1, 1, 1)
+bar.TextSize = 16
+bar.Font = Enum.Font.GothamBold
+bar.TextXAlignment = Enum.TextXAlignment.Left
+Instance.new("UICorner", bar)
+
+local close = Instance.new("TextButton", main)
+close.Size = UDim2.new(0, 30, 0, 30)
+close.Position = UDim2.new(1, -37, 0, 7)
+close.Text = "X"
+close.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+close.TextColor3 = Color3.new(1, 1, 1)
+close.Font = Enum.Font.GothamBold
+Instance.new("UICorner", close)
+close.MouseButton1Click:Connect(function() sg:Destroy() end)
+
+local scroll = Instance.new("ScrollingFrame", main)
+scroll.Size = UDim2.new(1, -10, 1, -115)
+scroll.Position = UDim2.new(0, 5, 0, 50)
+scroll.BackgroundTransparency = 1
+scroll.ScrollBarThickness = 4
+scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+local layout = Instance.new("UIListLayout", scroll)
+layout.SortOrder = Enum.SortOrder.LayoutOrder
+layout.Padding = UDim.new(0, 6)
+
+layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    scroll.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 10)
+end)
+
+local function makeBtn(txt, color, order, cb)
+    local b = Instance.new("TextButton", scroll)
+    b.Size = UDim2.new(1, -10, 0, 36)
+    b.BackgroundColor3 = color
+    b.Text = txt
+    b.TextSize = 13
+    b.TextColor3 = Color3.new(1, 1, 1)
+    b.Font = Enum.Font.GothamSemibold
+    b.LayoutOrder = order
+    Instance.new("UICorner", b)
+    b.MouseButton1Click:Connect(function() cb(b) end)
+    return b
+end
+
+local function makeBox(labelTxt, defaultTxt, order, cb)
+    local frame = Instance.new("Frame", scroll)
+    frame.Size = UDim2.new(1, -10, 0, 36)
+    frame.BackgroundTransparency = 1
+    frame.LayoutOrder = order
+
+    local lbl = Instance.new("TextLabel", frame)
+    lbl.Size = UDim2.new(0.55, 0, 1, 0)
+    lbl.Text = labelTxt
+    lbl.TextColor3 = Color3.new(1, 1, 1)
+    lbl.TextSize = 13
+    lbl.Font = Enum.Font.Gotham
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.BackgroundTransparency = 1
+
+    local box = Instance.new("TextBox", frame)
+    box.Size = UDim2.new(0.42, 0, 1, 0)
+    box.Position = UDim2.new(0.58, 0, 0, 0)
+    box.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+    box.Text = defaultTxt
+    box.TextColor3 = Color3.new(0, 1, 0)
+    box.TextSize = 14
+    box.Font = Enum.Font.GothamBold
+    box.ClearTextOnFocus = false
+    Instance.new("UICorner", box)
+
+    box.FocusLost:Connect(function()
+        local val = tonumber(box.Text)
+        if val ~= nil then
+            cb(val)
+        else
+            box.Text = defaultTxt
+        end
+    end)
+    return box
+end
+
+-- UI 按鈕設置
+makeBtn("快速攻擊：關閉", Color3.fromRGB(60, 60, 70), 1, function(b)
+    Config.FastAttackMob = not Config.FastAttackMob
+    b.Text = "快速攻擊：" .. (Config.FastAttackMob and "開啟" or "關閉")
+    b.BackgroundColor3 = Config.FastAttackMob and Color3.fromRGB(0, 150, 80) or Color3.fromRGB(60, 60, 70)
+end)
+
+makeBtn("雙倍攻擊 (DoubleAttack)：開啟", Color3.fromRGB(0, 150, 80), 2, function(b)
+    Config.DoubleAttack = not Config.DoubleAttack
+    b.Text = "雙倍攻擊 (DoubleAttack)：" .. (Config.DoubleAttack and "開啟" or "關閉")
+    b.BackgroundColor3 = Config.DoubleAttack and Color3.fromRGB(0, 150, 80) or Color3.fromRGB(60, 60, 70)
+end)
+
+makeBtn("移除動畫鎖 (RemoveAnim)：開啟", Color3.fromRGB(0, 150, 80), 3, function(b)
+    Config.RemoveAnimationFast = not Config.RemoveAnimationFast
+    b.Text = "移除動畫鎖 (RemoveAnim)：" .. (Config.RemoveAnimationFast and "開啟" or "關閉")
+    b.BackgroundColor3 = Config.RemoveAnimationFast and Color3.fromRGB(0, 150, 80) or Color3.fromRGB(60, 60, 70)
+end)
+
+makeBtn("果實M1光環：關閉", Color3.fromRGB(60, 60, 70), 4, function(b)
+    Config.FruitM1Aura = not Config.FruitM1Aura
+    b.Text = "果實M1光環：" .. (Config.FruitM1Aura and "開啟" or "關閉")
+    b.BackgroundColor3 = Config.FruitM1Aura and Color3.fromRGB(0, 150, 80) or Color3.fromRGB(60, 60, 70)
+end)
+
+makeBtn("自動飛怪刷關：關閉", Color3.fromRGB(60, 60, 70), 5, function(b)
+    State.AutoFarm = not State.AutoFarm
+    b.Text = "自動飛怪刷關：" .. (State.AutoFarm and "開啟" or "關閉")
+    b.BackgroundColor3 = State.AutoFarm and Color3.fromRGB(0, 150, 80) or Color3.fromRGB(60, 60, 70)
+end)
+
+makeBtn("聚怪：關閉", Color3.fromRGB(60, 60, 70), 6, function(b)
+    State.BringMob = not State.BringMob
+    b.Text = "聚怪：" .. (State.BringMob and "開啟" or "關閉")
+    b.BackgroundColor3 = State.BringMob and Color3.fromRGB(180, 100, 0) or Color3.fromRGB(60, 60, 70)
+end)
+
+makeBtn("自動武裝色：關閉", Color3.fromRGB(60, 60, 70), 7, function(b)
+    State.AutoBuso = not State.AutoBuso
+    b.Text = "自動武裝色：" .. (State.AutoBuso and "開啟" or "關閉")
+    b.BackgroundColor3 = State.AutoBuso and Color3.fromRGB(0, 150, 80) or Color3.fromRGB(60, 60, 70)
+end)
+
+makeBtn("自動 V3 技能：關閉", Color3.fromRGB(60, 60, 70), 8, function(b)
+    State.AutoV3 = not State.AutoV3
+    b.Text = "自動 V3 技能：" .. (State.AutoV3 and "開啟" or "關閉")
+    b.BackgroundColor3 = State.AutoV3 and Color3.fromRGB(0, 150, 80) or Color3.fromRGB(60, 60, 70)
+end)
+
+makeBtn("自動 V4 技能：關閉", Color3.fromRGB(60, 60, 70), 9, function(b)
+    State.AutoV4 = not State.AutoV4
+    b.Text = "自動 V4 技能：" .. (State.AutoV4 and "開啟" or "關閉")
+    b.BackgroundColor3 = State.AutoV4 and Color3.fromRGB(0, 150, 80) or Color3.fromRGB(60, 60, 70)
+end)
+
+makeBox("攻擊範圍 (Range):", tostring(Config.AttackRange), 10, function(val)
+    Config.AttackRange = val
+end)
+
+makeBox("攻速延遲 (Delay):", tostring(Config.FastAttackDelay), 11, function(val)
+    Config.FastAttackDelay = val
+end)
+
+makeBox("果實M1頻率 (ClickDelay):", tostring(Config.ClickDelay), 12, function(val)
+    Config.ClickDelay = val
+end)
+
+local status = Instance.new("TextLabel", main)
+status.Size = UDim2.new(1, 0, 0, 60)
+status.Position = UDim2.new(0, 0, 1, -65)
+status.Text = "關卡：第 1 關\n狀態：待機中"
+status.TextSize = 13
+status.TextColor3 = Color3.new(1, 1, 0)
+status.BackgroundTransparency = 1
+
+-- ━━━━━━━━━━━━━━━━━━━━━━ 玩家飛行鎖定物理幀同步 ━━━━━━━━━━━━━━━━━━━━━━
+local function freezePlayerPhysics(char)
+    if not char then return end
+    for _, part in ipairs(char:GetChildren()) do
+        if part:IsA("BasePart") then
+            part.Velocity = BringZero
+            part.RotVelocity = BringZero
+            pcall(function()
+                part.AssemblyLinearVelocity = BringZero
+                part.AssemblyAngularVelocity = BringZero
+            end)
+        end
+    end
+end
+
+RunService.Heartbeat:Connect(function()
+    if State.AutoFarm and character and hrp and humanoid and humanoid.Health > 0 then
+        if FarmPos then
+            freezePlayerPhysics(character)
+            local targetPos = FarmPos.Position + Vector3.new(0, CONFIG.AboveMonsterOffset, 0)
+            hrp.CFrame = CFrame.new(targetPos)
+        end
+    end
+end)
+
+-- ━━━━━━━━━━━━━━━━━━━━━━ 主邏輯與關卡掃描 ━━━━━━━━━━━━━━━━━━━━━━
+local dungeonTeleporting = false
+local lastDungeonTeleport = 0
+local enterRoomTime = tick() 
+
+task.spawn(function()
+    while true do
+        task.wait(0.08)
+        getRef()
+        
+        if not character or not hrp or not humanoid or humanoid.Health <= 0 then
+            State.StatusText = "等待角色重生..."
+            status.Text = "關卡：第 " .. tostring(State.LockedLevel) .. " 關\n狀態：" .. State.StatusText
+            continue 
+        end
+        
+        local map = workspace:FindFirstChild("Map")
+        local dungeon = map and map:FindFirstChild("Dungeon")
+        if dungeon then
+            for _, lv in pairs(dungeon:GetChildren()) do
+                local n = tonumber(lv.Name)
+                local floor = lv:FindFirstChild("Floor") or lv:FindFirstChildWhichIsA("BasePart")
+                if n and floor and (hrp.Position - floor.Position).Magnitude < 600 then
+                    if State.LockedLevel ~= n then
+                        State.LockedLevel = n
+                        enterRoomTime = tick() 
+                    end
+                end
+            end
+        end
+
+        doBuffs()
+        callV4()
+        autoEquipWeapon()
+
+        if State.AutoFarm then
+            local ef = workspace:FindFirstChild("Enemies")
+            local closest, minDist = nil, math.huge
+            local priorityTargets = {}
+
+            if ef then
+                for _, npc in ipairs(ef:GetChildren()) do
+                    if npc.Name == "Blank Buddy" or isShadow(npc.Name) then continue end
+                    local npcHum  = npc:FindFirstChild("Humanoid")
+                    local npcRoot = npc:FindFirstChild("HumanoidRootPart") or npc.PrimaryPart
+                    if npcHum and npcHum.Health > Config.HealthMobThreshold and npcRoot then
+                        local d = (npcRoot.Position - hrp.Position).Magnitude
+                        if npc.Name == "PropHitboxPlaceholder" and d <= 600 then
+                            table.insert(priorityTargets, npcRoot)
+                        end
+                        if d < minDist and d <= 600 then
+                            minDist = d
+                            closest = npcRoot
+                        end
+                    end
+                end
+            end
+
+            local target = (#priorityTargets > 0) and priorityTargets[1] or closest
+
+            if target then
+                enterRoomTime = 0 
+                FarmPos = target.CFrame
+                MonFarm = target.Parent and target.Parent.Name or ""
+
+                pcall(function() target.CanCollide = false end)
+                
+                pcall(function()
+                    local bv = hrp:FindFirstChild("FlyVelocity")
+                    if not bv then
+                        bv = Instance.new("BodyVelocity")
+                        bv.Name = "FlyVelocity"
+                        bv.Velocity = Vector3.new(0, 0, 0)
+                        bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                        bv.Parent = hrp
+                    end
+                end)
+                
+                State.StatusText = "鎖定怪頭上: " .. (target.Parent and target.Parent.Name or "?")
+            else
+                FarmPos = nil
+                MonFarm = nil
+
+                local timeSinceEnter = tick() - enterRoomTime
+
+                if timeSinceEnter < CONFIG.EnterRoomWaitTime then
+                    local timeLeft = string.format("%.1f", CONFIG.EnterRoomWaitTime - timeSinceEnter)
+                    State.StatusText = "已進入第 " .. tostring(State.LockedLevel) .. " 關，等待怪物生成 (" .. timeLeft .. "s)..."
+                    
+                    pcall(function()
+                        local bv = hrp:FindFirstChild("FlyVelocity")
+                        if not bv then
+                            bv = Instance.new("BodyVelocity")
+                            bv.Name = "FlyVelocity"
+                            bv.Velocity = Vector3.new(0, 0, 0)
+                            bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                            bv.Parent = hrp
+                        end
+                    end)
+                else
+                    if not dungeonTeleporting then
+                        local mapObj = workspace:FindFirstChild("Map")
+                        local dungeonObj = mapObj and mapObj:FindFirstChild("Dungeon")
+                        local targetExit, exitMinDist = nil, math.huge
+                        
+                        if dungeonObj then
+                            for _, level in ipairs(dungeonObj:GetChildren()) do
+                                if tonumber(level.Name) then
+                                    local tp = level:FindFirstChild("ExitTeleporter")
+                                    if tp then
+                                        local root = tp:FindFirstChild("Root") or tp:FindFirstChildWhichIsA("BasePart")
+                                        if root then
+                                            local d = (hrp.Position - root.Position).Magnitude
+                                            if d < exitMinDist and d < 1000 then
+                                                exitMinDist = d
+                                                targetExit = root
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+
+                        if targetExit and tick() - lastDungeonTeleport >= 2 then
+                            dungeonTeleporting = true
+                            lastDungeonTeleport = tick()
+                            
+                            enterRoomTime = tick() 
+                            
+                            TweenService:Create(hrp, TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {CFrame = targetExit.CFrame}):Play()
+                            
+                            task.delay(1.2, function() dungeonTeleporting = false end)
+                            State.StatusText = "飛往下一關出口..."
+                        else
+                            pcall(function()
+                                local bv = hrp:FindFirstChild("FlyVelocity")
+                                if bv then bv:Destroy() end
+                            end)
+                            State.StatusText = "搜尋下一關出口中..."
+                        end
+                    end
+                end
+            end
+        else
+            pcall(function()
+                local bv = hrp:FindFirstChild("FlyVelocity")
+                if bv then bv:Destroy() end
+            end)
+            FarmPos = nil
+            MonFarm = nil
+            State.StatusText = Config.FastAttackMob and "快速攻擊待命 (手動走位)" or "待機中"
+        end
+        
+        status.Text = "關卡：第 " .. tostring(State.LockedLevel) .. " 關\n狀態：" .. State.StatusText
+    end
+end)
