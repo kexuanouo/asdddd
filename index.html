@@ -1,0 +1,1638 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>厭璃 YLI × Specter Hub — 幽靈級操作體驗</title>
+<meta name="description" content="厭璃 YLI × Specter Hub，power by 可軒。ESP 視覺感知、智慧跟隨、Blox Fruits 專用模組，超過 60 項功能。">
+<style>
+/* ============================================================
+   厭璃 YLI × Specter Hub — 設計系統
+   iOS Dark / Glassmorphism
+   ============================================================ */
+:root{
+  --bg-0:#05060c;
+  --bg-1:#0a0c16;
+  --bg-2:#10121f;
+
+  --glass:rgba(255,255,255,.055);
+  --glass-strong:rgba(255,255,255,.09);
+  --stroke:rgba(255,255,255,.10);
+  --stroke-strong:rgba(255,255,255,.18);
+
+  --txt-0:#f5f6fb;
+  --txt-1:#b9bdd1;
+  --txt-2:#7c8299;
+
+  --violet:#8b5cff;
+  --violet-2:#b18cff;
+  --cyan:#31e2f5;
+  --pink:#ff5c9d;
+  --amber:#ffb020;
+  --green:#35e08a;
+  --red:#ff5f6d;
+
+  --grad-main:linear-gradient(120deg,#8b5cff 0%,#5b8cff 45%,#31e2f5 100%);
+  --grad-warm:linear-gradient(120deg,#ff5c9d 0%,#ffb020 100%);
+
+  --r-xl:32px;
+  --r-lg:24px;
+  --r-md:18px;
+  --r-sm:12px;
+
+  --shadow-lg:0 30px 80px -20px rgba(0,0,0,.75);
+  --shadow-glow:0 0 60px -10px rgba(139,92,255,.55);
+
+  --ease:cubic-bezier(.22,.61,.36,1);
+  --ease-out:cubic-bezier(.16,1,.3,1);
+}
+
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro TC","PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;
+  background:var(--bg-0);
+  color:var(--txt-0);
+  line-height:1.65;
+  overflow-x:hidden;
+  letter-spacing:.01em;
+  -webkit-font-smoothing:antialiased;
+}
+::selection{background:rgba(139,92,255,.4);color:#fff}
+
+/* 捲軸 */
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:20px;border:2px solid var(--bg-0)}
+::-webkit-scrollbar-thumb:hover{background:rgba(139,92,255,.5)}
+
+/* ---------- 背景層 ---------- */
+.bg-layer{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.blob{
+  position:absolute;border-radius:50%;filter:blur(110px);opacity:.5;
+  will-change:transform;
+}
+.blob.b1{width:620px;height:620px;background:radial-gradient(circle,#8b5cff,transparent 68%);top:-180px;left:-140px;animation:drift1 22s ease-in-out infinite}
+.blob.b2{width:560px;height:560px;background:radial-gradient(circle,#31e2f5,transparent 68%);top:12%;right:-200px;animation:drift2 26s ease-in-out infinite}
+.blob.b3{width:520px;height:520px;background:radial-gradient(circle,#ff5c9d,transparent 68%);bottom:6%;left:22%;opacity:.32;animation:drift3 30s ease-in-out infinite}
+@keyframes drift1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(140px,90px) scale(1.15)}}
+@keyframes drift2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-120px,140px) scale(.9)}}
+@keyframes drift3{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(90px,-110px) scale(1.2)}}
+
+.grid-overlay{
+  position:absolute;inset:0;
+  background-image:linear-gradient(rgba(255,255,255,.028) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(255,255,255,.028) 1px,transparent 1px);
+  background-size:64px 64px;
+  mask-image:radial-gradient(ellipse 90% 60% at 50% 0%,#000 30%,transparent 78%);
+  -webkit-mask-image:radial-gradient(ellipse 90% 60% at 50% 0%,#000 30%,transparent 78%);
+}
+.noise{
+  position:absolute;inset:0;opacity:.035;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* 光標光暈 */
+#cursor-glow{
+  position:fixed;width:520px;height:520px;border-radius:50%;
+  background:radial-gradient(circle,rgba(139,92,255,.13),transparent 62%);
+  pointer-events:none;z-index:1;transform:translate(-50%,-50%);
+  transition:opacity .4s;will-change:transform;
+}
+@media(hover:none){#cursor-glow{display:none}}
+
+/* ---------- 版面 ---------- */
+.wrap{position:relative;z-index:2;max-width:1200px;margin:0 auto;padding:0 24px}
+section{position:relative;z-index:2}
+
+/* ---------- 導覽列 ---------- */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  padding:14px 0;transition:all .45s var(--ease);
+}
+nav.scrolled{
+  padding:8px 0;
+  background:rgba(8,9,16,.72);
+  -webkit-backdrop-filter:blur(24px) saturate(180%);
+  backdrop-filter:blur(24px) saturate(180%);
+  border-bottom:1px solid var(--stroke);
+}
+.nav-inner{display:flex;align-items:center;justify-content:space-between;gap:20px}
+.logo{display:flex;align-items:center;gap:11px;text-decoration:none;color:inherit;flex-shrink:0}
+.logo-mark{
+  width:38px;height:38px;border-radius:12px;
+  background:var(--grad-main);
+  display:grid;place-items:center;
+  font-weight:800;font-size:17px;color:#fff;
+  box-shadow:0 8px 24px -6px rgba(139,92,255,.7);
+  position:relative;overflow:hidden;
+}
+.logo-mark::after{
+  content:"";position:absolute;inset:0;
+  background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.55) 50%,transparent 70%);
+  transform:translateX(-120%);
+  animation:shine 4.5s ease-in-out infinite;
+}
+@keyframes shine{0%,62%{transform:translateX(-120%)}82%,100%{transform:translateX(120%)}}
+.logo-txt{line-height:1.15}
+.logo-txt b{font-size:16px;font-weight:700;letter-spacing:.02em;display:block}
+.logo-txt span{font-size:10.5px;color:var(--txt-2);letter-spacing:.14em;text-transform:uppercase}
+
+.nav-links{display:flex;align-items:center;gap:4px}
+.nav-links a{
+  color:var(--txt-1);text-decoration:none;font-size:14px;font-weight:500;
+  padding:8px 15px;border-radius:100px;transition:all .28s var(--ease);
+  position:relative;
+}
+.nav-links a:hover{color:#fff;background:var(--glass-strong)}
+.nav-links a.active{color:#fff}
+.nav-links a.active::after{
+  content:"";position:absolute;bottom:2px;left:50%;transform:translateX(-50%);
+  width:16px;height:2px;border-radius:2px;background:var(--grad-main);
+}
+.nav-cta{
+  padding:9px 20px;border-radius:100px;font-size:13.5px;font-weight:600;
+  background:var(--grad-main);color:#fff;text-decoration:none;
+  box-shadow:0 8px 24px -8px rgba(139,92,255,.85);
+  transition:transform .3s var(--ease),box-shadow .3s;
+  white-space:nowrap;
+}
+.nav-cta:hover{transform:translateY(-2px);box-shadow:0 14px 32px -8px rgba(139,92,255,1)}
+.burger{display:none;width:40px;height:40px;border-radius:12px;background:var(--glass);border:1px solid var(--stroke);cursor:pointer;place-items:center}
+.burger span{display:block;width:17px;height:1.6px;background:#fff;border-radius:2px;transition:.3s var(--ease)}
+.burger span+span{margin-top:4.5px}
+
+/* ---------- Hero ---------- */
+.hero{padding:170px 0 90px;text-align:center}
+.badge{
+  display:inline-flex;align-items:center;gap:9px;
+  padding:7px 17px 7px 8px;border-radius:100px;
+  background:var(--glass);border:1px solid var(--stroke);
+  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+  font-size:12.5px;color:var(--txt-1);margin-bottom:26px;
+}
+.badge .dot{
+  width:19px;height:19px;border-radius:50%;
+  background:rgba(53,224,138,.16);display:grid;place-items:center;
+}
+.badge .dot i{width:6.5px;height:6.5px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.72)}}
+
+h1.hero-title{
+  font-size:clamp(42px,7.6vw,86px);
+  line-height:1.03;font-weight:800;letter-spacing:-.035em;margin-bottom:8px;
+}
+.hero-title .grad{
+  background:var(--grad-main);-webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;
+  background-size:220% auto;animation:flow 6s linear infinite;
+}
+@keyframes flow{to{background-position:220% center}}
+.type-line{
+  font-size:clamp(15px,2.2vw,20px);color:var(--txt-1);
+  min-height:1.7em;font-weight:400;letter-spacing:.02em;
+}
+.type-line .cursor{
+  display:inline-block;width:2px;height:1.05em;vertical-align:-.16em;
+  background:var(--cyan);margin-left:3px;animation:blink 1.05s step-end infinite;
+}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+
+.hero-sub{
+  max-width:620px;margin:22px auto 0;color:var(--txt-2);font-size:15.5px;
+}
+.hero-sub .hl{color:var(--violet-2);font-weight:600}
+.hero-sub .hl2{color:var(--cyan);font-weight:600}
+
+.hero-actions{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:38px}
+.btn{
+  position:relative;display:inline-flex;align-items:center;gap:9px;
+  padding:15px 32px;border-radius:100px;font-size:15px;font-weight:600;
+  text-decoration:none;cursor:pointer;border:none;overflow:hidden;
+  transition:transform .34s var(--ease),box-shadow .34s;
+  font-family:inherit;
+}
+.btn-primary{background:var(--grad-main);color:#fff;box-shadow:0 16px 44px -14px rgba(139,92,255,.95)}
+.btn-primary:hover{transform:translateY(-3px) scale(1.02);box-shadow:0 24px 56px -14px rgba(139,92,255,1)}
+.btn-primary::before{
+  content:"";position:absolute;inset:0;
+  background:linear-gradient(115deg,transparent 32%,rgba(255,255,255,.42) 50%,transparent 68%);
+  transform:translateX(-130%);
+}
+.btn-primary:hover::before{transition:transform .85s var(--ease);transform:translateX(130%)}
+.btn-ghost{
+  background:var(--glass);color:var(--txt-0);border:1px solid var(--stroke-strong);
+  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+}
+.btn-ghost:hover{transform:translateY(-3px);background:var(--glass-strong);border-color:rgba(255,255,255,.3)}
+
+.hero-note{margin-top:18px;font-size:12.5px;color:var(--txt-2);letter-spacing:.02em}
+
+/* 浮動 UI 預覽 */
+.preview-wrap{perspective:1600px;margin-top:74px;display:flex;justify-content:center}
+.preview{
+  width:min(760px,100%);border-radius:var(--r-lg);overflow:hidden;
+  background:linear-gradient(160deg,rgba(22,24,38,.94),rgba(11,12,22,.96));
+  border:1px solid var(--stroke-strong);
+  box-shadow:var(--shadow-lg),var(--shadow-glow);
+  transform-style:preserve-3d;
+  transition:transform .5s var(--ease);
+  position:relative;
+}
+.preview::after{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(150deg,rgba(255,255,255,.09),transparent 42%);
+}
+.pv-bar{
+  display:flex;align-items:center;gap:8px;padding:13px 16px;
+  border-bottom:1px solid var(--stroke);background:rgba(255,255,255,.028);
+}
+.pv-dot{width:11px;height:11px;border-radius:50%}
+.pv-title{margin-left:8px;font-size:12.5px;font-weight:600;color:var(--txt-1);letter-spacing:.03em}
+.pv-title em{font-style:normal;color:var(--violet-2)}
+.pv-badge{
+  margin-left:auto;font-size:10.5px;padding:3px 10px;border-radius:100px;
+  background:rgba(53,224,138,.14);color:var(--green);border:1px solid rgba(53,224,138,.3);
+  font-weight:600;letter-spacing:.04em;
+}
+.pv-tabs{display:flex;gap:5px;padding:12px 16px 0;overflow-x:auto}
+.pv-tab{
+  font-size:11.5px;padding:6px 14px;border-radius:100px;white-space:nowrap;
+  background:rgba(255,255,255,.05);color:var(--txt-2);border:1px solid transparent;
+  transition:.3s var(--ease);
+}
+.pv-tab.on{background:rgba(139,92,255,.2);color:#fff;border-color:rgba(139,92,255,.5)}
+.pv-body{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:16px}
+.pv-row{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:10px 13px;border-radius:14px;background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.055);font-size:12px;color:var(--txt-1);
+}
+.pv-sw{
+  width:38px;height:21px;border-radius:100px;background:rgba(255,255,255,.14);
+  position:relative;flex-shrink:0;transition:background .4s var(--ease);
+}
+.pv-sw i{
+  position:absolute;top:2.5px;left:2.5px;width:16px;height:16px;border-radius:50%;
+  background:#fff;transition:transform .4s var(--ease);box-shadow:0 2px 6px rgba(0,0,0,.4);
+}
+.pv-row.on .pv-sw{background:linear-gradient(120deg,#8b5cff,#31e2f5)}
+.pv-row.on .pv-sw i{transform:translateX(17px)}
+.pv-val{font-variant-numeric:tabular-nums;color:var(--cyan);font-weight:600;font-size:11.5px}
+
+/* ---------- 數據列 ---------- */
+.stats{padding:60px 0 30px}
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.stat{
+  padding:26px 22px;border-radius:var(--r-lg);text-align:center;
+  background:var(--glass);border:1px solid var(--stroke);
+  -webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);
+  transition:transform .45s var(--ease),border-color .45s,background .45s;
+  position:relative;overflow:hidden;
+}
+.stat::before{
+  content:"";position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(139,92,255,.85),transparent);
+  opacity:0;transition:opacity .45s;
+}
+.stat:hover{transform:translateY(-6px);border-color:var(--stroke-strong);background:var(--glass-strong)}
+.stat:hover::before{opacity:1}
+.stat-num{
+  font-size:clamp(28px,4vw,40px);font-weight:800;letter-spacing:-.03em;
+  background:var(--grad-main);-webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;
+  font-variant-numeric:tabular-nums;line-height:1.15;
+}
+.stat-num .suf{font-size:.62em;margin-left:1px}
+.stat-label{font-size:13px;color:var(--txt-2);margin-top:6px;letter-spacing:.03em}
+
+/* ---------- 通用區塊標題 ---------- */
+.sec-head{text-align:center;margin-bottom:52px}
+.sec-tag{
+  display:inline-block;font-size:11.5px;letter-spacing:.22em;text-transform:uppercase;
+  color:var(--violet-2);font-weight:700;margin-bottom:14px;
+}
+.sec-title{font-size:clamp(30px,4.6vw,48px);font-weight:800;letter-spacing:-.03em;line-height:1.14}
+.sec-desc{color:var(--txt-2);max-width:600px;margin:16px auto 0;font-size:15px}
+
+/* ---------- 功能分類 ---------- */
+.features{padding:90px 0}
+.tabs{
+  display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:42px;
+}
+.tab{
+  padding:10px 22px;border-radius:100px;font-size:13.5px;font-weight:600;
+  background:var(--glass);border:1px solid var(--stroke);color:var(--txt-1);
+  cursor:pointer;transition:.32s var(--ease);font-family:inherit;
+  display:inline-flex;align-items:center;gap:8px;
+}
+.tab:hover{color:#fff;border-color:var(--stroke-strong);transform:translateY(-2px)}
+.tab.on{
+  background:var(--grad-main);color:#fff;border-color:transparent;
+  box-shadow:0 12px 30px -12px rgba(139,92,255,.95);
+}
+.tab .cnt{
+  font-size:10.5px;padding:1px 7px;border-radius:100px;background:rgba(255,255,255,.16);
+  font-variant-numeric:tabular-nums;
+}
+.tab.on .cnt{background:rgba(255,255,255,.28)}
+
+.card-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.fcard{
+  padding:24px;border-radius:var(--r-lg);
+  background:var(--glass);border:1px solid var(--stroke);
+  -webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);
+  transition:transform .45s var(--ease),border-color .45s,background .45s,box-shadow .45s;
+  position:relative;overflow:hidden;
+  animation:cardIn .5s var(--ease-out) both;
+}
+@keyframes cardIn{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:none}}
+.fcard::after{
+  content:"";position:absolute;inset:0;opacity:0;transition:opacity .45s;
+  background:radial-gradient(400px circle at var(--mx,50%) var(--my,50%),rgba(139,92,255,.16),transparent 62%);
+  pointer-events:none;
+}
+.fcard:hover{transform:translateY(-7px);border-color:var(--stroke-strong);background:var(--glass-strong);box-shadow:0 24px 60px -24px rgba(0,0,0,.9)}
+.fcard:hover::after{opacity:1}
+.fc-ico{
+  width:44px;height:44px;border-radius:13px;display:grid;place-items:center;
+  background:linear-gradient(140deg,rgba(139,92,255,.24),rgba(49,226,245,.14));
+  border:1px solid rgba(139,92,255,.28);margin-bottom:15px;
+  transition:transform .45s var(--ease);
+}
+.fcard:hover .fc-ico{transform:scale(1.09) rotate(-5deg)}
+.fc-ico svg{width:21px;height:21px;stroke:var(--violet-2);fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.fc-name{font-size:15.5px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.fc-name .en{font-size:10.5px;color:var(--txt-2);font-weight:500;letter-spacing:.05em}
+.fc-desc{font-size:13px;color:var(--txt-2);line-height:1.62}
+.fc-tag{
+  display:inline-block;margin-top:12px;font-size:10.5px;padding:3px 10px;border-radius:100px;
+  background:rgba(255,255,255,.06);border:1px solid var(--stroke);color:var(--txt-1);
+  letter-spacing:.03em;
+}
+.fc-tag.hot{background:rgba(255,92,157,.14);border-color:rgba(255,92,157,.35);color:#ff9dc4}
+.fc-tag.new{background:rgba(53,224,138,.13);border-color:rgba(53,224,138,.32);color:#7ff0b8}
+
+/* ---------- 熱門功能 ---------- */
+.hot{padding:90px 0}
+.hot-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
+.hot-card{
+  padding:30px;border-radius:var(--r-xl);position:relative;overflow:hidden;
+  background:linear-gradient(155deg,rgba(24,26,42,.9),rgba(11,12,22,.94));
+  border:1px solid var(--stroke);
+  transition:transform .5s var(--ease),border-color .5s,box-shadow .5s;
+}
+.hot-card:hover{transform:translateY(-8px);border-color:var(--stroke-strong);box-shadow:0 34px 80px -30px rgba(0,0,0,.95)}
+.hot-card.big{grid-column:span 2;display:grid;grid-template-columns:1.05fr .95fr;gap:30px;align-items:center}
+.hc-glow{
+  position:absolute;width:320px;height:320px;border-radius:50%;filter:blur(90px);
+  opacity:.28;pointer-events:none;transition:opacity .5s;
+}
+.hot-card:hover .hc-glow{opacity:.48}
+.hc-rank{
+  display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:700;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--amber);margin-bottom:13px;
+}
+.hc-rank .n{
+  width:20px;height:20px;border-radius:6px;background:rgba(255,176,32,.16);
+  display:grid;place-items:center;font-size:11px;
+}
+.hc-title{font-size:22px;font-weight:800;letter-spacing:-.02em;margin-bottom:9px}
+.hc-desc{font-size:13.5px;color:var(--txt-2);line-height:1.7}
+.hc-meta{display:flex;gap:16px;margin-top:18px;flex-wrap:wrap}
+.hc-meta div{font-size:11.5px;color:var(--txt-2)}
+.hc-meta b{display:block;font-size:17px;font-weight:700;color:var(--txt-0);font-variant-numeric:tabular-nums}
+
+/* 熱門功能內的視覺演示 */
+.demo{
+  border-radius:var(--r-md);padding:18px;background:rgba(0,0,0,.36);
+  border:1px solid var(--stroke);position:relative;overflow:hidden;min-height:196px;
+}
+.demo-esp{position:relative;height:160px}
+.esp-box{
+  position:absolute;border:1.5px solid var(--cyan);border-radius:5px;
+  animation:espPulse 2.4s ease-in-out infinite;
+}
+@keyframes espPulse{0%,100%{opacity:.55;transform:scale(1)}50%{opacity:1;transform:scale(1.035)}}
+.esp-tag{
+  position:absolute;top:-19px;left:-1.5px;font-size:9.5px;padding:1px 7px;border-radius:5px;
+  background:var(--cyan);color:#04121a;font-weight:700;white-space:nowrap;
+}
+.esp-line{position:absolute;left:50%;bottom:-30px;width:1.4px;height:74px;background:linear-gradient(180deg,transparent,rgba(49,226,245,.85));transform-origin:top center}
+.demo-bar{height:7px;border-radius:100px;background:rgba(255,255,255,.09);overflow:hidden;margin-top:11px}
+.demo-bar i{display:block;height:100%;border-radius:100px;background:var(--grad-main);animation:barFill 3.4s var(--ease-out) infinite}
+@keyframes barFill{0%{width:12%}55%{width:88%}100%{width:12%}}
+.demo-rows{display:flex;flex-direction:column;gap:8px}
+.demo-row{display:flex;align-items:center;justify-content:space-between;font-size:11.5px;color:var(--txt-2);padding:8px 11px;border-radius:11px;background:rgba(255,255,255,.04)}
+.demo-row .v{color:var(--cyan);font-weight:600;font-variant-numeric:tabular-nums}
+.demo-row .v.g{color:var(--green)}
+
+/* ---------- 促銷 ---------- */
+.promo{padding:90px 0 100px}
+.promo-box{
+  border-radius:var(--r-xl);padding:44px 38px;position:relative;overflow:hidden;
+  background:linear-gradient(150deg,rgba(139,92,255,.17),rgba(49,226,245,.07) 48%,rgba(255,92,157,.12));
+  border:1px solid rgba(139,92,255,.32);
+  box-shadow:0 40px 100px -40px rgba(139,92,255,.6);
+}
+.promo-box::before{
+  content:"";position:absolute;inset:0;
+  background-image:linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px);
+  background-size:44px 44px;opacity:.5;
+  mask-image:radial-gradient(ellipse 80% 80% at 50% 0%,#000,transparent 75%);
+  -webkit-mask-image:radial-gradient(ellipse 80% 80% at 50% 0%,#000,transparent 75%);
+}
+.promo-inner{position:relative;z-index:2}
+.promo-head{text-align:center;margin-bottom:34px}
+.promo-flash{
+  display:inline-flex;align-items:center;gap:8px;padding:6px 16px;border-radius:100px;
+  background:rgba(255,92,157,.16);border:1px solid rgba(255,92,157,.4);
+  font-size:12px;font-weight:700;color:#ff9dc4;letter-spacing:.06em;margin-bottom:16px;
+}
+.promo-flash .zap{animation:zap 1.4s ease-in-out infinite}
+@keyframes zap{0%,100%{transform:scale(1) rotate(0)}50%{transform:scale(1.22) rotate(9deg)}}
+.promo-title{font-size:clamp(26px,4vw,40px);font-weight:800;letter-spacing:-.03em;line-height:1.2}
+.promo-title .grad{background:var(--grad-warm);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.promo-sub{color:var(--txt-1);margin-top:12px;font-size:14.5px}
+
+/* 倒數 */
+.countdown{display:flex;justify-content:center;gap:12px;margin:32px 0 40px;flex-wrap:wrap}
+.cd-item{
+  min-width:82px;padding:16px 12px;border-radius:var(--r-md);text-align:center;
+  background:rgba(0,0,0,.34);border:1px solid var(--stroke-strong);
+  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+}
+.cd-num{
+  font-size:34px;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums;
+  line-height:1.05;background:var(--grad-main);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+}
+.cd-lbl{font-size:10.5px;color:var(--txt-2);letter-spacing:.14em;text-transform:uppercase;margin-top:4px}
+.cd-sep{font-size:26px;font-weight:800;color:var(--txt-2);align-self:center;opacity:.5}
+
+/* 方案 */
+.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;align-items:stretch}
+.plan{
+  padding:28px 24px;border-radius:var(--r-lg);display:flex;flex-direction:column;
+  background:rgba(8,9,16,.62);border:1px solid var(--stroke);
+  -webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);
+  transition:transform .45s var(--ease),border-color .45s,box-shadow .45s;
+  position:relative;
+}
+.plan:hover{transform:translateY(-7px);border-color:var(--stroke-strong)}
+.plan.feat{
+  border-color:rgba(139,92,255,.6);
+  background:linear-gradient(165deg,rgba(139,92,255,.16),rgba(8,9,16,.78));
+  box-shadow:0 30px 70px -28px rgba(139,92,255,.85);
+  transform:scale(1.035);
+}
+.plan.feat:hover{transform:scale(1.035) translateY(-7px)}
+.plan-flag{
+  position:absolute;top:-12px;left:50%;transform:translateX(-50%);
+  font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  padding:5px 15px;border-radius:100px;background:var(--grad-main);color:#fff;
+  box-shadow:0 8px 22px -8px rgba(139,92,255,1);white-space:nowrap;
+}
+.plan-name{font-size:15px;font-weight:700;letter-spacing:.02em}
+.plan-name .en{display:block;font-size:10.5px;color:var(--txt-2);font-weight:500;letter-spacing:.1em;margin-top:2px}
+.plan-price{margin:18px 0 4px;display:flex;align-items:baseline;gap:6px}
+.plan-price .cur{font-size:17px;font-weight:600;color:var(--txt-1)}
+.plan-price .amt{font-size:44px;font-weight:800;letter-spacing:-.04em;font-variant-numeric:tabular-nums;line-height:1}
+.plan-price .per{font-size:13px;color:var(--txt-2)}
+.plan-was{font-size:12.5px;color:var(--txt-2);text-decoration:line-through;min-height:1.4em}
+.plan-save{
+  display:inline-block;margin-top:8px;font-size:11px;font-weight:700;padding:3px 10px;border-radius:100px;
+  background:rgba(53,224,138,.15);color:#7ff0b8;border:1px solid rgba(53,224,138,.3);
+}
+.plan-list{list-style:none;margin:22px 0 24px;display:flex;flex-direction:column;gap:11px;flex:1}
+.plan-list li{display:flex;gap:10px;font-size:13px;color:var(--txt-1);align-items:flex-start;line-height:1.55}
+.plan-list .ck{
+  width:17px;height:17px;border-radius:50%;flex-shrink:0;margin-top:2px;
+  background:rgba(139,92,255,.2);display:grid;place-items:center;
+}
+.plan-list .ck svg{width:10px;height:10px;stroke:var(--violet-2);stroke-width:3;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.plan-list li.off{color:var(--txt-2);opacity:.55}
+.plan-list li.off .ck{background:rgba(255,255,255,.06)}
+.plan-list li.off .ck svg{stroke:var(--txt-2)}
+.plan-btn{
+  width:100%;padding:14px;border-radius:14px;font-size:14px;font-weight:700;
+  border:1px solid var(--stroke-strong);background:var(--glass-strong);color:#fff;
+  cursor:pointer;font-family:inherit;transition:.32s var(--ease);
+}
+.plan-btn:hover{background:rgba(255,255,255,.14);transform:translateY(-2px)}
+.plan-btn.solid{background:var(--grad-main);border-color:transparent;box-shadow:0 14px 34px -14px rgba(139,92,255,1)}
+.plan-btn.solid:hover{box-shadow:0 20px 44px -14px rgba(139,92,255,1)}
+
+/* 優惠碼 */
+.coupon{
+  margin-top:30px;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;
+  padding:18px 22px;border-radius:var(--r-md);
+  background:rgba(0,0,0,.34);border:1px dashed rgba(255,176,32,.5);
+}
+.coupon-txt{font-size:13.5px;color:var(--txt-1)}
+.coupon-code{
+  font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  font-size:17px;font-weight:700;letter-spacing:.16em;color:var(--amber);
+  padding:8px 18px;border-radius:11px;background:rgba(255,176,32,.12);
+  border:1px solid rgba(255,176,32,.34);cursor:pointer;transition:.3s var(--ease);
+  position:relative;
+}
+.coupon-code:hover{background:rgba(255,176,32,.2);transform:scale(1.04)}
+.coupon-code.copied{color:var(--green);border-color:rgba(53,224,138,.5);background:rgba(53,224,138,.14)}
+
+/* ---------- 頁尾 ---------- */
+footer{
+  border-top:1px solid var(--stroke);padding:56px 0 40px;position:relative;z-index:2;
+  background:rgba(5,6,12,.6);
+}
+.foot-grid{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;gap:34px;margin-bottom:40px}
+.foot-brand p{font-size:13px;color:var(--txt-2);margin-top:14px;max-width:300px;line-height:1.75}
+.foot-col h4{font-size:12.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--txt-1);margin-bottom:15px}
+.foot-col a{display:block;font-size:13.5px;color:var(--txt-2);text-decoration:none;padding:5px 0;transition:.28s var(--ease)}
+.foot-col a:hover{color:var(--violet-2);transform:translateX(4px)}
+.foot-bottom{
+  display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap;
+  padding-top:26px;border-top:1px solid var(--stroke);font-size:12.5px;color:var(--txt-2);
+}
+.foot-bottom .powered b{color:var(--violet-2)}
+.socials{display:flex;gap:9px}
+.socials a{
+  width:36px;height:36px;border-radius:11px;display:grid;place-items:center;
+  background:var(--glass);border:1px solid var(--stroke);transition:.32s var(--ease);
+}
+.socials a:hover{background:var(--glass-strong);border-color:var(--stroke-strong);transform:translateY(-3px)}
+.socials svg{width:16px;height:16px;stroke:var(--txt-1);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.socials a:hover svg{stroke:var(--violet-2)}
+
+/* ---------- 捲動顯現 ---------- */
+.reveal{opacity:0;transform:translateY(34px);transition:opacity .85s var(--ease-out),transform .85s var(--ease-out)}
+.reveal.in{opacity:1;transform:none}
+.d1{transition-delay:.08s}.d2{transition-delay:.16s}.d3{transition-delay:.24s}
+.d4{transition-delay:.32s}.d5{transition-delay:.4s}.d6{transition-delay:.48s}
+
+/* ---------- 回到頂部 ---------- */
+#toTop{
+  position:fixed;right:24px;bottom:24px;z-index:99;
+  width:46px;height:46px;border-radius:14px;display:grid;place-items:center;
+  background:rgba(16,18,31,.86);border:1px solid var(--stroke-strong);
+  -webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);
+  cursor:pointer;opacity:0;pointer-events:none;transform:translateY(14px) scale(.9);
+  transition:.42s var(--ease);
+}
+#toTop.show{opacity:1;pointer-events:auto;transform:none}
+#toTop:hover{border-color:rgba(139,92,255,.7);box-shadow:0 12px 30px -10px rgba(139,92,255,.9)}
+#toTop svg{width:17px;height:17px;stroke:var(--txt-0);stroke-width:2.2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+
+/* ---------- 進度條 ---------- */
+#progress{
+  position:fixed;top:0;left:0;height:2px;z-index:200;width:0;
+  background:var(--grad-main);box-shadow:0 0 14px rgba(139,92,255,.9);
+  transition:width .12s linear;
+}
+
+/* ============================================================
+   v2 增補：曲線圖背景 / 粒子 / 分類配色 / 永久免費方案
+   ============================================================ */
+.hero{position:relative;overflow:hidden}
+.particles{position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+.particles i{
+  position:absolute;bottom:-14px;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,255,255,.95),rgba(139,92,255,.3));
+  opacity:0;animation:rise linear infinite;
+}
+@keyframes rise{
+  0%{transform:translate(0,0) scale(1);opacity:0}
+  10%{opacity:.8}
+  80%{opacity:.3}
+  100%{transform:translate(46px,-76vh) scale(.5);opacity:0}
+}
+
+/* 統計區曲線圖背景 */
+.stats-chart{position:absolute;left:0;right:0;top:-26px;bottom:0;pointer-events:none;z-index:0}
+.stats-chart svg{width:100%;height:100%;display:block}
+.sc-line{
+  fill:none;stroke:url(#scGrad);stroke-width:2.6;stroke-linecap:round;
+  stroke-dasharray:2600;stroke-dashoffset:2600;
+  animation:drawLine 3.2s var(--ease-out) .5s forwards;
+  filter:drop-shadow(0 0 9px rgba(49,226,245,.55));
+}
+.sc-line2{
+  fill:none;stroke:rgba(255,92,157,.4);stroke-width:1.5;stroke-dasharray:3 9;
+  stroke-dashoffset:2600;animation:drawLine 3.8s var(--ease-out) 1s forwards;
+}
+.sc-area{fill:url(#scFill);opacity:0;animation:fadeArea 1.8s ease 2s forwards}
+@keyframes drawLine{to{stroke-dashoffset:0}}
+@keyframes fadeArea{to{opacity:1}}
+.sc-dot{fill:#fff;filter:drop-shadow(0 0 7px #31e2f5);animation:dotPulse 2.6s ease-in-out infinite}
+@keyframes dotPulse{0%,100%{opacity:.55}50%{opacity:1}}
+
+/* 區塊標題底部流光 */
+.sec-head{position:relative;padding-bottom:22px;margin-bottom:56px}
+.sec-head::after{
+  content:"";position:absolute;left:50%;bottom:0;transform:translateX(-50%);
+  width:78px;height:3px;border-radius:4px;
+  background:var(--grad-main);background-size:200% auto;
+  animation:flow 4s linear infinite;
+}
+
+/* 功能卡分類配色 */
+.fcard{--ac:#8b5cff;--ac-soft:rgba(139,92,255,.16);--ac-line:rgba(139,92,255,.38)}
+.fcard::before{
+  content:"";position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--ac),transparent);
+  opacity:0;transition:opacity .45s;
+}
+.fcard:hover::before{opacity:1}
+.fcard::after{background:radial-gradient(400px circle at var(--mx,50%) var(--my,50%),var(--ac-soft),transparent 62%)}
+.fc-ico{
+  background:linear-gradient(140deg,var(--ac-soft),rgba(255,255,255,.02));
+  border:1px solid var(--ac-line);
+  animation:icoBob 5.4s ease-in-out infinite;
+  animation-delay:calc(var(--i,0)*.4s);
+}
+.fc-ico svg{stroke:var(--ac)}
+.fc-idx{
+  position:absolute;top:10px;right:16px;font-size:34px;font-weight:800;
+  color:rgba(255,255,255,.05);letter-spacing:-.05em;pointer-events:none;
+  font-variant-numeric:tabular-nums;line-height:1;
+}
+.fc-bar{height:4px;border-radius:100px;background:rgba(255,255,255,.07);margin-top:14px;overflow:hidden}
+.fc-bar i{display:block;height:100%;border-radius:100px;background:var(--ac);box-shadow:0 0 12px var(--ac);animation:barGrow 1.25s var(--ease-out) .3s both}
+@keyframes barGrow{from{width:0}}
+.tab.on{background:var(--ac,#8b5cff)}
+.tab.on{
+  background:linear-gradient(120deg,var(--ac,#8b5cff),color-mix(in srgb,var(--ac,#8b5cff) 55%,#31e2f5));
+}
+
+/* 快速攻擊 demo */
+.demo-keys{display:flex;gap:8px;margin-bottom:12px}
+.demo-keys span{
+  flex:1;text-align:center;padding:9px 0;border-radius:10px;
+  font-size:13px;font-weight:700;letter-spacing:.04em;
+  background:rgba(255,255,255,.06);border:1px solid var(--stroke);color:var(--txt-2);
+  animation:keyHit 2.6s infinite;
+}
+.demo-keys span:nth-child(2){animation-delay:.12s}
+.demo-keys span:nth-child(3){animation-delay:.24s}
+.demo-keys span:nth-child(4){animation-delay:.36s}
+.demo-keys span:nth-child(5){animation-delay:.48s}
+@keyframes keyHit{
+  0%,16%,100%{background:rgba(255,255,255,.06);color:var(--txt-2);border-color:var(--stroke);transform:scale(1)}
+  7%{background:linear-gradient(120deg,#ff5c9d,#ffb020);color:#fff;border-color:transparent;transform:scale(1.1)}
+}
+.combo{color:#ff9dc4!important;font-weight:800!important}
+.demo-bar.hot i{background:var(--grad-warm);animation-duration:1.5s}
+
+/* 永久免費橫幅 + 活動卡 */
+.free-banner{
+  position:relative;overflow:hidden;display:grid;grid-template-columns:1.5fr auto;gap:26px;align-items:center;
+  padding:30px 32px;border-radius:var(--r-lg);margin-bottom:18px;
+  background:linear-gradient(140deg,rgba(53,224,138,.15),rgba(8,9,16,.55) 55%);
+  border:1px solid rgba(53,224,138,.35);
+}
+.fb-shine{
+  position:absolute;inset:0;pointer-events:none;transform:translateX(-130%);
+  background:linear-gradient(115deg,transparent 36%,rgba(53,224,138,.16) 50%,transparent 64%);
+  animation:shine 5.5s ease-in-out infinite;
+}
+.fb-price{display:flex;align-items:baseline;gap:7px}
+.fb-price .cur{font-size:22px;font-weight:700;color:var(--green)}
+.fb-price .amt{
+  font-size:58px;font-weight:800;letter-spacing:-.04em;line-height:1;
+  background:linear-gradient(120deg,#35e08a,#31e2f5);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+}
+.fb-price .per{font-size:14px;color:var(--green);font-weight:700;letter-spacing:.08em}
+.fb-txt{color:var(--txt-1);font-size:14px;margin-top:10px;line-height:1.85}
+.fb-chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.fb-chips span{
+  font-size:11.5px;padding:5px 13px;border-radius:100px;font-weight:600;
+  background:rgba(53,224,138,.12);border:1px solid rgba(53,224,138,.3);color:#7ff0b8;
+}
+.fb-btn{white-space:nowrap}
+.events-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.ev-card{
+  display:flex;gap:14px;padding:20px;border-radius:var(--r-lg);
+  background:rgba(8,9,16,.62);border:1px solid var(--stroke);
+  transition:transform .4s var(--ease),border-color .4s,background .4s;
+}
+.ev-card:hover{transform:translateY(-5px);border-color:var(--stroke-strong);background:rgba(20,22,36,.72)}
+.ev-ico{
+  width:42px;height:42px;border-radius:12px;display:grid;place-items:center;
+  flex-shrink:0;
+  background:var(--ac-soft,rgba(139,92,255,.16));border:1px solid var(--stroke);
+  animation:icoBob 4s ease-in-out infinite;
+}
+.ev-ico svg{width:20px;height:20px;stroke:var(--ac,#8b5cff);fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+@keyframes icoBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.ev-name{font-size:14.5px;font-weight:700;margin-bottom:5px}
+.ev-desc{font-size:12.5px;color:var(--txt-2);line-height:1.65}
+.cd-cap{text-align:center;font-size:11.5px;color:var(--txt-2);letter-spacing:.16em;text-transform:uppercase;margin-bottom:14px}
+
+@media(max-width:900px){
+  .free-banner{grid-template-columns:1fr}
+  .events-grid{grid-template-columns:1fr}
+  .fb-price .amt{font-size:46px}
+}
+
+/* ---------- 響應式 ---------- */
+@media(max-width:1024px){
+  .card-grid{grid-template-columns:repeat(2,1fr)}
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  .hot-card.big{grid-column:span 2;grid-template-columns:1fr}
+  .foot-grid{grid-template-columns:1fr 1fr;gap:26px}
+}
+@media(max-width:768px){
+  .nav-links{display:none}
+  .nav-cta{display:none}
+  .burger{display:grid}
+  .hero{padding:132px 0 64px}
+  .card-grid{grid-template-columns:1fr}
+  .hot-grid{grid-template-columns:1fr}
+  .hot-card.big{grid-column:span 1}
+  .plans{grid-template-columns:1fr}
+  .plan.feat{transform:none}
+  .plan.feat:hover{transform:translateY(-7px)}
+  .pv-body{grid-template-columns:1fr}
+  .promo-box{padding:32px 22px}
+  .cd-item{min-width:66px;padding:13px 9px}
+  .cd-num{font-size:26px}
+  .foot-grid{grid-template-columns:1fr;gap:24px}
+  .foot-bottom{flex-direction:column;text-align:center}
+  .preview-wrap{margin-top:52px}
+}
+@media(max-width:480px){
+  .wrap{padding:0 16px}
+  .stats-grid{grid-template-columns:1fr 1fr;gap:11px}
+  .stat{padding:20px 14px}
+  .hero-actions .btn{width:100%;justify-content:center}
+}
+
+/* 減少動態偏好 */
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
+  .reveal{opacity:1;transform:none}
+}
+</style>
+</head>
+<body>
+
+<!-- 進度條 -->
+<div id="progress"></div>
+
+<!-- 背景 -->
+<div class="bg-layer">
+  <div class="blob b1"></div>
+  <div class="blob b2"></div>
+  <div class="blob b3"></div>
+  <div class="grid-overlay"></div>
+  <div class="noise"></div>
+</div>
+<div id="cursor-glow"></div>
+
+<!-- ================= 導覽列 ================= -->
+<nav id="nav">
+  <div class="wrap nav-inner">
+    <a href="#top" class="logo">
+      <div class="logo-mark">厭</div>
+      <div class="logo-txt">
+        <b>厭璃 YLI</b>
+        <span>Specter Hub</span>
+      </div>
+    </a>
+    <div class="nav-links" id="navLinks">
+      <a href="#stats">使用量</a>
+      <a href="#features">功能分類</a>
+      <a href="#hot">熱門功能</a>
+      <a href="#promo">限時活動</a>
+    </div>
+    <a href="#promo" class="nav-cta">立即取得腳本</a>
+    <div class="burger" id="burger" role="button" aria-label="選單">
+      <div><span></span><span></span><span></span></div>
+    </div>
+  </div>
+</nav>
+
+<!-- ================= HERO ================= -->
+<header class="hero" id="top">
+  <div class="particles" id="particles" aria-hidden="true"></div>
+  <div class="wrap">
+    <div class="badge reveal">
+      <span class="dot"><i></i></span>
+      <span>線上 <b id="onlineNow">3,271</b> 人正在使用 · 服務正常</span>
+    </div>
+
+    <h1 class="hero-title reveal d1">
+      <span class="grad">厭璃</span> 之下<br>
+      萬物皆可<span class="grad">掌控</span>
+    </h1>
+
+    <div class="type-line reveal d2">
+      <span id="typed"></span><span class="cursor"></span>
+    </div>
+
+    <p class="hero-sub reveal d3">
+      <span class="hl">厭璃 YLI</span> × <span class="hl2">Specter Hub</span> — 整合 ESP 視覺感知、智慧跟隨傳送、
+      Blox Fruits 專用模組與效能優化的全方位腳本中樞。
+      <br>power by <b>可軒</b>，為極致操作而生。
+    </p>
+
+    <div class="hero-actions reveal d4">
+      <a href="#promo" class="btn btn-primary" id="magnetBtn">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><path d="m6 10 6 6 6-6"/><path d="M4 21h16"/></svg>
+        免費取得腳本
+      </a>
+      <a href="#features" class="btn btn-ghost">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        瀏覽 60+ 功能
+      </a>
+    </div>
+
+    <p class="hero-note reveal d5">永久免費 · 無需安裝 · 複製一行指令即可載入 · 支援主流執行器</p>
+
+    <!-- 浮動 UI 預覽 -->
+    <div class="preview-wrap reveal d6">
+      <div class="preview" id="preview">
+        <div class="pv-bar">
+          <span class="pv-dot" style="background:#ff5f6d"></span>
+          <span class="pv-dot" style="background:#ffb020"></span>
+          <span class="pv-dot" style="background:#35e08a"></span>
+          <span class="pv-title"><em>厭璃</em> Hub[Free Forever]</span>
+          <span class="pv-badge">● CONNECTED</span>
+        </div>
+        <div class="pv-tabs">
+          <span class="pv-tab on">Home</span>
+          <span class="pv-tab">ESP</span>
+          <span class="pv-tab">Other</span>
+          <span class="pv-tab">BF</span>
+          <span class="pv-tab">Visual</span>
+          <span class="pv-tab">Config</span>
+        </div>
+        <div class="pv-body" id="pvBody">
+          <div class="pv-row on" data-sync="1"><span>Move to Target</span><span class="pv-sw"><i></i></span></div>
+          <div class="pv-row on"><span>Tween Mode</span><span class="pv-sw"><i></i></span></div>
+          <div class="pv-row" data-sync="2"><span>Circle Target</span><span class="pv-sw"><i></i></span></div>
+          <div class="pv-row" data-sync="3"><span>Hide Tween</span><span class="pv-sw"><i></i></span></div>
+          <div class="pv-row on"><span>Name ESP</span><span class="pv-sw"><i></i></span></div>
+          <div class="pv-row" data-sync="4"><span>Highlight ESP</span><span class="pv-sw"><i></i></span></div>
+          <div class="pv-row on"><span>Speed</span><span class="pv-val">350</span></div>
+          <div class="pv-row on"><span>Auto Save</span><span class="pv-sw"><i></i></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ================= 使用量 ================= -->
+<section class="stats" id="stats">
+  <!-- 動態成長曲線背景 -->
+  <div class="stats-chart" aria-hidden="true">
+    <svg viewBox="0 0 1200 320" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="scGrad" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#8b5cff"/>
+          <stop offset=".55" stop-color="#5b8cff"/>
+          <stop offset="1" stop-color="#31e2f5"/>
+        </linearGradient>
+        <linearGradient id="scFill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="rgba(139,92,255,.22)"/>
+          <stop offset="1" stop-color="rgba(139,92,255,0)"/>
+        </linearGradient>
+      </defs>
+      <path class="sc-area" d="M0,250 C160,230 260,150 420,170 C580,190 660,100 810,118 C960,136 1090,60 1200,48 L1200,320 L0,320 Z"/>
+      <path class="sc-line2" d="M0,285 C180,270 300,205 470,215 C640,225 760,160 910,168 C1040,175 1130,120 1200,112"/>
+      <path class="sc-line" d="M0,250 C160,230 260,150 420,170 C580,190 660,100 810,118 C960,136 1090,60 1200,48"/>
+      <circle class="sc-dot" cx="420" cy="170" r="4"/>
+      <circle class="sc-dot" cx="810" cy="118" r="4" style="animation-delay:.5s"/>
+      <circle class="sc-dot" cx="1200" cy="48" r="5"/>
+    </svg>
+  </div>
+  <div class="wrap">
+    <div class="stats-grid">
+      <div class="stat reveal">
+        <div class="stat-num"><span class="count" data-to="128400" data-suffix="+">0</span></div>
+        <div class="stat-label">累計用戶</div>
+      </div>
+      <div class="stat reveal d1">
+        <div class="stat-num"><span class="count" data-to="8.6" data-dec="1" data-suffix="M+">0</span></div>
+        <div class="stat-label">腳本執行次數</div>
+      </div>
+      <div class="stat reveal d2">
+        <div class="stat-num"><span class="count" data-to="62" data-suffix="+">0</span></div>
+        <div class="stat-label">內建功能模組</div>
+      </div>
+      <div class="stat reveal d3">
+        <div class="stat-num"><span class="count" data-to="99.8" data-dec="1" data-suffix="%">0</span></div>
+        <div class="stat-label">版本更新成功率</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 功能分類 ================= -->
+<section class="features" id="features">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-tag">Features</div>
+      <h2 class="sec-title">六大模組 · 62 項功能</h2>
+      <p class="sec-desc">從視覺感知到戰鬥輔助，全部整合在單一玻璃面板中，切換零延遲。</p>
+    </div>
+
+    <div class="tabs reveal d1" id="tabs"></div>
+    <div class="card-grid" id="cardGrid"></div>
+  </div>
+</section>
+
+<!-- ================= 熱門功能 ================= -->
+<section class="hot" id="hot">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-tag">Top Picks</div>
+      <h2 class="sec-title">玩家最常用的功能</h2>
+      <p class="sec-desc">依照過去 30 天的啟用次數統計，這五項功能幾乎每場都會被打開。</p>
+    </div>
+
+    <div class="hot-grid">
+      <!-- 大卡：快速攻擊 -->
+      <div class="hot-card big reveal">
+        <div class="hc-glow" style="background:#ff5c9d;top:-90px;right:-70px"></div>
+        <div>
+          <div class="hc-rank"><span class="n">1</span> Most Used</div>
+          <h3 class="hc-title">Fast Attack — 快速攻擊</h3>
+          <p class="hc-desc">
+            縮短攻擊間隔，可分別對玩家與怪物獨立啟用，支援三段強度模式，
+            並能與佛像形態範圍、M1 光環疊加——連招快到只剩殘影。
+          </p>
+          <div class="hc-meta">
+            <div><b>1,692,400</b>30 天啟用次數</div>
+            <div><b>3 段</b>強度模式</div>
+            <div><b>0.08s</b>最短攻擊間隔</div>
+          </div>
+        </div>
+        <div class="demo">
+          <div class="demo-rows">
+            <div class="demo-keys">
+              <span>Z</span><span>X</span><span>C</span><span>V</span><span>F</span>
+            </div>
+            <div class="demo-row"><span>當前模式</span><span class="v g">強化 × 3</span></div>
+            <div class="demo-row"><span>攻擊間隔</span><span class="v">0.08 s</span></div>
+            <div class="demo-row"><span>連擊數</span><span class="v combo" id="comboNum">× 24</span></div>
+            <div class="demo-bar hot"><i></i></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 卡 2 -->
+      <div class="hot-card reveal d1">
+        <div class="hc-glow" style="background:#8b5cff;top:-100px;right:-60px"></div>
+        <div>
+          <div class="hc-rank"><span class="n">2</span> Most Used</div>
+          <h3 class="hc-title">Move to Target — 智慧跟隨</h3>
+          <p class="hc-desc">
+            選定目標後自動維持距離，可切換 Tween 平滑模式或瞬移模式。
+            支援繞圈跟隨（Circle Target）、三軸偏移（Offset X/Y/Z）與
+            Y 軸繞過，貼身角度完全由你決定。
+          </p>
+          <div class="hc-meta">
+            <div><b>1,284,900</b>30 天啟用次數</div>
+            <div><b>&lt; 5ms</b>反應延遲</div>
+            <div><b>3 軸</b>偏移控制</div>
+          </div>
+        </div>
+        <div class="demo">
+          <div class="demo-rows">
+            <div class="demo-row"><span>Target Lock</span><span class="v g">已鎖定 · 玩家_8241</span></div>
+            <div class="demo-row"><span>Distance</span><span class="v">12.4 m</span></div>
+            <div class="demo-row"><span>Tween Speed</span><span class="v">350</span></div>
+            <div class="demo-row"><span>Circle Radius</span><span class="v">30</span></div>
+            <div class="demo-bar"><i></i></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 卡 2 -->
+      <div class="hot-card reveal d1">
+        <div class="hc-glow" style="background:#31e2f5;bottom:-100px;left:-70px"></div>
+        <div class="hc-rank"><span class="n">3</span> Most Used</div>
+        <h3 class="hc-title">Name ESP — 資訊標記</h3>
+        <p class="hc-desc">在角色頭上即時顯示名稱、距離與血量，並可疊加見聞色霸氣（Ken）狀態與剩餘閃避次數。</p>
+        <div class="demo" style="margin-top:18px">
+          <div class="demo-esp">
+            <div class="esp-line" style="left:24%"></div>
+            <div class="esp-box" style="left:18%;top:34px;width:74px;height:88px">
+              <span class="esp-tag">玩家_8241 · 12m</span>
+            </div>
+            <div class="esp-box" style="left:56%;top:56px;width:66px;height:80px;animation-delay:.8s">
+              <span class="esp-tag">玩家_3390 · 27m</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 卡 3 -->
+      <div class="hot-card reveal d2">
+        <div class="hc-glow" style="background:#ff5c9d;top:-100px;left:-60px"></div>
+        <div class="hc-rank"><span class="n">4</span> Most Used</div>
+        <h3 class="hc-title">Hide Tween — 隱藏軌跡</h3>
+        <p class="hc-desc">透過高低位置交替與服務端同步時差，讓移動軌跡在對方視角中呈現跳躍式斷點，而非連續直線。</p>
+        <div class="demo" style="margin-top:18px">
+          <div class="demo-rows">
+            <div class="demo-row"><span>軌跡可見度</span><span class="v">離散</span></div>
+            <div class="demo-row"><span>Bypass Y</span><span class="v g">啟用</span></div>
+            <div class="demo-row"><span>切換頻率</span><span class="v">0.17s</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 卡 4 -->
+      <div class="hot-card reveal d3">
+        <div class="hc-glow" style="background:#ffb020;bottom:-100px;right:-60px"></div>
+        <div class="hc-rank"><span class="n">5</span> Most Used</div>
+        <h3 class="hc-title">Fly Gui — 飛行控制</h3>
+        <p class="hc-desc">獨立懸浮面板，UP / DOWN 微調高度、速度等級 1–10 段即時切換，支援 R6 與 R15 骨骼。</p>
+        <div class="demo" style="margin-top:18px">
+          <div class="demo-rows">
+            <div class="demo-row"><span>速度等級</span><span class="v">× 3</span></div>
+            <div class="demo-row"><span>骨骼類型</span><span class="v">R15</span></div>
+            <div class="demo-row"><span>垂直微調</span><span class="v g">± 1 單位 / 幀</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 卡 5 -->
+      <div class="hot-card reveal d4">
+        <div class="hc-glow" style="background:#35e08a;top:-100px;right:-60px"></div>
+        <div class="hc-rank"><span class="n">5</span> Most Used</div>
+        <h3 class="hc-title">FPS Boost — 效能優化</h3>
+        <p class="hc-desc">一鍵降低渲染品質、移除貼圖與粒子、關閉全域陰影，低階設備也能穩定拉高幀數。</p>
+        <div class="demo" style="margin-top:18px">
+          <div class="demo-rows">
+            <div class="demo-row"><span>渲染品質</span><span class="v">Level 01</span></div>
+            <div class="demo-row"><span>全域陰影</span><span class="v">關閉</span></div>
+            <div class="demo-row"><span>預估提升</span><span class="v g">+45% FPS</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 促銷 ================= -->
+<section class="promo" id="promo">
+  <div class="wrap">
+    <div class="promo-box reveal">
+      <div class="promo-inner">
+        <div class="promo-head">
+          <div class="promo-flash"><span class="zap">⚡</span> 永久免費 · 本期活動開跑</div>
+          <h2 class="promo-title">厭璃 <span class="grad">永久免費</span></h2>
+          <p class="promo-sub">不花一毛錢，62 項功能全數開放；活動期間再送限定獎勵。</p>
+        </div>
+
+        <p class="cd-cap">— 距離本期活動結束 —</p>
+
+        <div class="countdown" id="countdown">
+          <div class="cd-item"><div class="cd-num" id="cd-h">72</div><div class="cd-lbl">Hours</div></div>
+          <div class="cd-sep">:</div>
+          <div class="cd-item"><div class="cd-num" id="cd-m">00</div><div class="cd-lbl">Minutes</div></div>
+          <div class="cd-sep">:</div>
+          <div class="cd-item"><div class="cd-num" id="cd-s">00</div><div class="cd-lbl">Seconds</div></div>
+        </div>
+
+        <div class="free-banner reveal">
+          <div class="fb-shine"></div>
+          <div class="fb-info">
+            <div class="fb-price"><span class="cur">¥</span><span class="amt">0</span><span class="per">永久免費</span></div>
+            <p class="fb-txt">全部 <b>62</b> 項功能完整開放——無訂閱、無鎖功能、無廣告。<br>厭璃相信：好工具，應該屬於每一個玩家。</p>
+            <div class="fb-chips">
+              <span>62 項功能全開</span><span>終身免費更新</span><span>雲端設定同步</span><span>多語言支援</span>
+            </div>
+          </div>
+          <a href="#top" class="btn btn-primary fb-btn" id="freeBtn">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><path d="m6 10 6 6 6-6"/><path d="M4 21h16"/></svg>
+            立即免費取得
+          </a>
+        </div>
+
+        <div class="events-grid">
+          <div class="ev-card reveal d1">
+            <div class="ev-ico" style="--ac:#ffb020;--ac-soft:rgba(255,176,32,.16)">
+              <svg viewBox="0 0 24 24"><path d="M9 11.5V4.8a1.8 1.8 0 0 1 3.6 0v5.4"/><path d="M12.6 10.2V4.3a1.8 1.8 0 0 1 3.6 0v6.2"/><path d="M16.2 10.5V6.3a1.8 1.8 0 0 1 3.6 0v7.2c0 4.2-2.6 7-6.8 7-3.4 0-4.8-1.6-6.4-4.4L4 12.4c-.9-1.5.9-3.2 2.3-2.2l2.7 2"/></svg>
+            </div>
+            <div>
+              <div class="ev-name">新功能投票</div>
+              <p class="ev-desc">下個版本優先支援哪個遊戲模組？由社群投票決定，截止後立即開發。</p>
+            </div>
+          </div>
+
+          <div class="ev-card reveal d2">
+            <div class="ev-ico" style="--ac:#8b5cff;--ac-soft:rgba(139,92,255,.16)">
+              <svg viewBox="0 0 24 24"><rect x="3.5" y="8.5" width="17" height="12" rx="2.5"/><path d="M12 8.5v12"/><path d="M12 8.5c-1.8 0-4.5-.8-4.5-3 0-1.6 1.2-2.4 2.4-2.4C11.4 3.1 12 5.6 12 8.5Z"/><path d="M12 8.5c1.8 0 4.5-.8 4.5-3 0-1.6-1.2-2.4-2.4-2.4C12.6 3.1 12 5.6 12 8.5Z"/></svg>
+            </div>
+            <div>
+              <div class="ev-name">邀請有禮</div>
+              <p class="ev-desc">邀請 3 位好友加入社群，兌換限定「幽靈」身分組與專屬頭像框。</p>
+            </div>
+          </div>
+
+          <div class="ev-card reveal d3">
+            <div class="ev-ico" style="--ac:#31e2f5;--ac-soft:rgba(49,226,245,.16)">
+              <svg viewBox="0 0 24 24"><path d="M13 2.5 4.5 13.5h6l-1 8L18.5 10h-6z"/></svg>
+            </div>
+            <div>
+              <div class="ev-name">限時兌換碼</div>
+              <p class="ev-desc">活動期間輸入 <b>YLI10</b> 兌換碼，解鎖隱藏的幽靈主題皮膚。</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="coupon">
+          <span class="coupon-txt">活動期間輸入兌換碼，解鎖限定「幽靈」主題皮膚</span>
+          <span class="coupon-code" id="couponCode">YLI10</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 頁尾 ================= -->
+<footer>
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <a href="#top" class="logo">
+          <div class="logo-mark">厭</div>
+          <div class="logo-txt"><b>厭璃 YLI</b><span>Specter Hub</span></div>
+        </a>
+        <p>幽靈級操作體驗。整合視覺感知、智慧移動與遊戲專用模組的腳本中樞，為追求極致的玩家打造。</p>
+      </div>
+      <div class="foot-col">
+        <h4>產品</h4>
+        <a href="#features">功能總覽</a>
+        <a href="#hot">熱門功能</a>
+        <a href="#promo">價格方案</a>
+        <a href="#stats">使用數據</a>
+      </div>
+      <div class="foot-col">
+        <h4>支援</h4>
+        <a href="#">安裝指南</a>
+        <a href="#">常見問題</a>
+        <a href="#">更新日誌</a>
+        <a href="#">執行器相容表</a>
+      </div>
+      <div class="foot-col">
+        <h4>社群</h4>
+        <a href="#">Discord 伺服器</a>
+        <a href="#">YouTube 演示</a>
+        <a href="#">Telegram 通知</a>
+        <a href="#">意見回饋</a>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <div>© 2026 厭璃 YLI × Specter Hub. All rights reserved.</div>
+      <div class="powered">powered by <b>可軒</b></div>
+      <div class="socials">
+        <a href="#" aria-label="Discord"><svg viewBox="0 0 24 24"><path d="M8 12h.01M16 12h.01"/><path d="M7.5 5.5A17 17 0 0 1 12 5a17 17 0 0 1 4.5.5c2 3 3 6.5 3 10.5a14 14 0 0 1-4 2l-.8-1.6"/><path d="M8.3 16.4 7.5 18a14 14 0 0 1-4-2c0-4 1-7.5 3-10.5"/></svg></a>
+        <a href="#" aria-label="YouTube"><svg viewBox="0 0 24 24"><rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="m10.5 9.5 5 2.5-5 2.5z"/></svg></a>
+        <a href="#" aria-label="Telegram"><svg viewBox="0 0 24 24"><path d="M21.5 4.3 2.9 11.6c-1 .4-1 1 .1 1.3l4.6 1.4 1.8 5.4c.2.6.4.7 1 .3l2.5-1.9 4.4 3.3c.8.5 1.4.2 1.6-.7l3-14c.2-1-.4-1.4-1.4-1z"/><path d="m8.6 14.3 9.4-6.6-7.4 7.5-.3 3"/></svg></a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<button id="toTop" aria-label="回到頂部">
+  <svg viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
+</button>
+
+<script>
+/* ============================================================
+   1. 功能資料
+   ============================================================ */
+const ICONS = {
+  eye:'<path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z"/><circle cx="12" cy="12" r="2.6"/>',
+  move:'<path d="M5 12h14"/><path d="m13 6 6 6-6 6"/><path d="M5 5v14"/>',
+  sword:'<path d="M14.5 3.5 20.5 9.5"/><path d="m17 3 4 4-9.5 9.5-4-4z"/><path d="m6.5 14.5 3 3"/><path d="m3.5 20.5 3.5-3.5"/><path d="M3 21l1.5-1.5"/>',
+  fruit:'<path d="M12 8c3.5 0 6 2.6 6 6.2 0 3.4-2.4 5.8-6 5.8s-6-2.4-6-5.8C6 10.6 8.5 8 12 8Z"/><path d="M12 8V5"/><path d="M12 5c1.6 0 3-1.1 3-2.5-1.9 0-3 1-3 2.5Z"/>',
+  camera:'<path d="M4 7h2.5l1.3-2h8.4l1.3 2H20a1.6 1.6 0 0 1 1.6 1.6v8A1.6 1.6 0 0 1 20 18.2H4A1.6 1.6 0 0 1 2.4 16.6v-8A1.6 1.6 0 0 1 4 7Z"/><circle cx="12" cy="12.4" r="3.2"/>',
+  cpu:'<rect x="6.5" y="6.5" width="11" height="11" rx="2.4"/><path d="M10 3v3.5M14 3v3.5M10 17.5V21M14 17.5V21M3 10h3.5M3 14h3.5M17.5 10H21M17.5 14H21"/>'
+};
+
+const CATEGORIES = [
+  { id:'esp', name:'ESP 視覺感知', en:'Visual Perception', icon:'eye', color:'#31e2f5', items:[
+    { n:'Name ESP', zh:'資訊標記', d:'角色頭上顯示名稱、距離與血量，可疊加見聞色狀態。', tag:'hot' },
+    { n:'Box ESP V1', zh:'方框標記', d:'以 3D 方框框住目標，標準尺寸，適合近距離判位。' },
+    { n:'Box ESP V2', zh:'方框標記（大）', d:'放大版方框，遠距離與大範圍場景更好辨識。' },
+    { n:'Tracer ESP', zh:'追蹤線', d:'從自身畫線指向目標，20 FPS 更新，離屏自動隱藏。' },
+    { n:'Highlight ESP', zh:'輪廓高亮', d:'紫色填充 + 白色外框，穿透障礙物顯示目標輪廓。', tag:'new' },
+    { n:'Ken ESP', zh:'見聞色狀態', d:'顯示目標見聞色是否啟用與剩餘閃避次數。' },
+  ]},
+  { id:'move', name:'移動與傳送', en:'Movement', icon:'move', color:'#8b5cff', items:[
+    { n:'Move to Target', zh:'智慧跟隨', d:'鎖定目標後自動維持距離，支援繞圈與三軸偏移。', tag:'hot' },
+    { n:'Tween Mode', zh:'平滑傳送', d:'在瞬移與平滑補間之間切換，速度可自由調整。' },
+    { n:'Circle Target', zh:'繞圈跟隨', d:'以自訂半徑與速度繞著目標移動，可選平滑或稜角模式。' },
+    { n:'Hide Tween', zh:'隱藏軌跡', d:'高低位置交替，讓移動軌跡呈現離散斷點。', tag:'hot' },
+    { n:'Bypass Y Tween', zh:'垂直繞過', d:'忽略 Y 軸限制，直接跨越高度差完成傳送。' },
+    { n:'Take Ship', zh:'接管船隻', d:'自動定位最近的船隻座位並同步到目標所在船隻。' },
+  ]},
+  { id:'combat', name:'戰鬥輔助', en:'Combat Assist', icon:'sword', color:'#ff5c9d', items:[
+    { n:'Skill / Gun Aimbot', zh:'技能與槍械自動瞄準', d:'自動對準最近目標，可設定最大瞄準範圍與隊伍檢查。' },
+    { n:'Fast Attack', zh:'快速攻擊', d:'縮短攻擊間隔，可分別對玩家與怪物啟用。' },
+    { n:'Auto Kill 系列', zh:'自動擊殺', d:'三叉戟、雷電、賽西、佛像四種 Z / F 技能自動觸發。', tag:'hot' },
+    { n:'No Skill CD', zh:'無技能冷卻', d:'移除技能冷卻與眩暈時間，連招不中斷。' },
+    { n:'Super Dash', zh:'超級衝刺', d:'自訂衝刺距離，快速進出戰場。' },
+    { n:'Auto V3 / V4', zh:'種族技能自動化', d:'自動啟用 V3 與 V4 種族技能，維持常駐狀態。' },
+  ]},
+  { id:'bf', name:'Blox Fruits 專用', en:'Game Module', icon:'fruit', color:'#ffb020', items:[
+    { n:'海域自動識別', zh:'Sea Detection', d:'依 PlaceId 自動判定第一 / 第二 / 第三海域與地城。', tag:'new' },
+    { n:'島嶼傳送點', zh:'Island Warp', d:'內建天鵝宅邸、詛咒船、殭屍島、浮動龜、時之廟等座標。' },
+    { n:'requestEntrance', zh:'入口傳送', d:'呼叫服務端入口函數，安全繞過地形封鎖。' },
+    { n:'佛像形態範圍', zh:'Buddha Range', d:'佛像形態下攻擊範圍獨立設定，最高可達 3000。' },
+    { n:'Walk Water', zh:'水上行走', d:'在水面維持站立，不觸發落水狀態。' },
+    { n:'Auto Buso', zh:'自動武裝色', d:'自動維持武裝色霸氣，戰鬥中不中斷。' },
+  ]},
+  { id:'visual', name:'鏡頭與視覺', en:'Camera & Visual', icon:'camera', color:'#b18cff', items:[
+    { n:'Cam Lock', zh:'鏡頭鎖定', d:'鏡頭始終朝向目標頭部，兼顧自身操作與觀察。' },
+    { n:'Player View', zh:'玩家視角', d:'直接切換為目標的第一人稱視角。' },
+    { n:'Camera FOV', zh:'視野調整', d:'自由調整視野角度與最大縮放距離。' },
+    { n:'Remove Lava', zh:'移除岩漿', d:'隱藏場景岩漿，降低視覺干擾與傷害判定。' },
+    { n:'No Clip', zh:'穿透牆壁', d:'穿越地形障礙，快速抵達封閉區域。' },
+    { n:'Stats GUI', zh:'狀態面板', d:'常駐顯示 FPS、Ping 與當前座標。' },
+  ]},
+  { id:'sys', name:'系統與優化', en:'System', icon:'cpu', color:'#35e08a', items:[
+    { n:'FPS Boost', zh:'效能優化', d:'一鍵降渲染、去貼圖、關陰影，低階機也能穩幀。', tag:'hot' },
+    { n:'Auto Save', zh:'自動儲存', d:'所有開關與數值即時寫入設定檔，重開不丟失。' },
+    { n:'Auto Rejoin', zh:'自動重連', d:'被踢出時自動重新加入同一伺服器。' },
+    { n:'Anti OneShot', zh:'防一擊必殺', d:'V1 / V2 雙版本防護，降低被瞬殺風險。' },
+    { n:'Safe Void', zh:'安全虛空', d:'防止掉出地圖邊界，自動拉回安全位置。' },
+    { n:'多語言 / 雲端同步', zh:'i18n & Sync', d:'內建英日雙語，設定可跨裝置同步。', tag:'new' },
+  ]},
+];
+
+/* ============================================================
+   2. 渲染功能卡 + 分類切換
+   ============================================================ */
+const tabsEl = document.getElementById('tabs');
+const gridEl = document.getElementById('cardGrid');
+
+// 建立分類按鈕（含「全部」）
+const allTab = document.createElement('button');
+allTab.className = 'tab on';
+allTab.dataset.cat = 'all';
+const totalCount = CATEGORIES.reduce((s,c)=>s+c.items.length,0);
+allTab.innerHTML = `全部 <span class="cnt">${totalCount}</span>`;
+tabsEl.appendChild(allTab);
+
+CATEGORIES.forEach((c,i)=>{
+  const b = document.createElement('button');
+  b.className = 'tab';
+  b.dataset.cat = c.id;
+  b.style.setProperty('--ac', c.color);
+  b.style.animation = `cardIn .5s var(--ease-out) ${i*0.05}s both`;
+  b.innerHTML = `${c.name} <span class="cnt">${c.items.length}</span>`;
+  tabsEl.appendChild(b);
+});
+
+function tagHTML(t){
+  if(t==='hot') return '<span class="fc-tag hot">熱門</span>';
+  if(t==='new') return '<span class="fc-tag new">新增</span>';
+  return '';
+}
+
+function hexA(hex,a){
+  const h = hex.replace('#','');
+  return `rgba(${parseInt(h.slice(0,2),16)},${parseInt(h.slice(2,4),16)},${parseInt(h.slice(4,6),16)},${a})`;
+}
+
+function renderCards(cat){
+  const list = [];
+  CATEGORIES.forEach((c,ci)=>{
+    if(cat!=='all' && c.id!==cat) return;
+    c.items.forEach((it,i)=>list.push({...it, catName:c.name, icon:c.icon, color:c.color, pop:56+((i*37+ci*13)%42)}));
+  });
+
+  gridEl.innerHTML = list.map((it,i)=>`
+    <article class="fcard" style="animation-delay:${i*0.045}s;--ac:${it.color};--ac-soft:${hexA(it.color,.16)};--ac-line:${hexA(it.color,.38)};--i:${i%6}">
+      <span class="fc-idx">${String(i+1).padStart(2,'0')}</span>
+      <div class="fc-ico"><svg viewBox="0 0 24 24">${ICONS[it.icon]}</svg></div>
+      <div class="fc-name">${it.zh}<span class="en">${it.n}</span></div>
+      <p class="fc-desc">${it.d}</p>
+      ${tagHTML(it.tag)}
+      <div class="fc-bar" title="熱度 ${it.pop}%"><i style="width:${it.pop}%"></i></div>
+    </article>
+  `).join('');
+
+  // 卡片 hover 光暈追蹤
+  gridEl.querySelectorAll('.fcard').forEach(card=>{
+    card.addEventListener('mousemove',e=>{
+      const r = card.getBoundingClientRect();
+      card.style.setProperty('--mx',(e.clientX-r.left)+'px');
+      card.style.setProperty('--my',(e.clientY-r.top)+'px');
+    });
+  });
+}
+renderCards('all');
+
+tabsEl.addEventListener('click',e=>{
+  const t = e.target.closest('.tab');
+  if(!t) return;
+  tabsEl.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+  t.classList.add('on');
+  renderCards(t.dataset.cat);
+});
+
+/* ============================================================
+   3. 捲動顯現 (IntersectionObserver)
+   ============================================================ */
+const io = new IntersectionObserver((entries)=>{
+  entries.forEach(en=>{
+    if(en.isIntersecting){
+      en.target.classList.add('in');
+      // 數字計數
+      const counters = en.target.querySelectorAll('.count');
+      counters.forEach(runCount);
+      io.unobserve(en.target);
+    }
+  });
+},{threshold:.14, rootMargin:'0px 0px -40px 0px'});
+
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+
+/* ============================================================
+   4. 數字滾動
+   ============================================================ */
+function runCount(el){
+  if(el.dataset.done) return;
+  el.dataset.done = '1';
+  const to = parseFloat(el.dataset.to);
+  const dec = parseInt(el.dataset.dec||'0',10);
+  const suf = el.dataset.suffix||'';
+  const dur = 1800;
+  const t0 = performance.now();
+  function tick(now){
+    let p = Math.min((now-t0)/dur,1);
+    // easeOutExpo
+    const e = p===1 ? 1 : 1-Math.pow(2,-10*p);
+    const v = to*e;
+    el.textContent = (dec? v.toFixed(dec) : Math.round(v).toLocaleString('en-US')) ;
+    if(p<1) requestAnimationFrame(tick);
+    else el.innerHTML = (dec? to.toFixed(dec) : Math.round(to).toLocaleString('en-US')) + `<span class="suf">${suf}</span>`;
+  }
+  requestAnimationFrame(tick);
+}
+
+/* ============================================================
+   5. 打字機
+   ============================================================ */
+const PHRASES = [
+  '幽靈級操作體驗，由厭璃驅動。',
+  'ESP · 智慧跟隨 · 自動瞄準 · 一鍵搞定。',
+  '62 項功能，全部整合在一塊玻璃面板裡。',
+  'power by 可軒 — 為極致而生。'
+];
+(function typewriter(){
+  const el = document.getElementById('typed');
+  let pi=0, ci=0, del=false;
+  function step(){
+    const txt = PHRASES[pi];
+    if(!del){
+      el.textContent = txt.slice(0,++ci);
+      if(ci===txt.length){ del=true; return setTimeout(step,1900); }
+      setTimeout(step,58);
+    }else{
+      el.textContent = txt.slice(0,--ci);
+      if(ci===0){ del=false; pi=(pi+1)%PHRASES.length; return setTimeout(step,320); }
+      setTimeout(step,26);
+    }
+  }
+  setTimeout(step,600);
+})();
+
+/* ============================================================
+   6. 導覽列 / 進度條 / 回到頂部 / 當前區塊
+   ============================================================ */
+const nav = document.getElementById('nav');
+const progress = document.getElementById('progress');
+const toTop = document.getElementById('toTop');
+const sections = ['stats','features','hot','promo'];
+const navAs = document.querySelectorAll('#navLinks a');
+
+function onScroll(){
+  const y = window.scrollY;
+  nav.classList.toggle('scrolled', y>40);
+  toTop.classList.toggle('show', y>700);
+  const h = document.documentElement.scrollHeight - window.innerHeight;
+  progress.style.width = (h>0 ? (y/h)*100 : 0)+'%';
+
+  // 當前區塊高亮
+  let cur = '';
+  sections.forEach(id=>{
+    const s = document.getElementById(id);
+    if(s && s.getBoundingClientRect().top <= window.innerHeight*0.42) cur = id;
+  });
+  navAs.forEach(a=>a.classList.toggle('active', a.getAttribute('href')==='#'+cur));
+}
+window.addEventListener('scroll',onScroll,{passive:true});
+onScroll();
+
+toTop.addEventListener('click',()=>window.scrollTo({top:0,behavior:'smooth'}));
+
+// 手機選單
+const burger = document.getElementById('burger');
+burger.addEventListener('click',()=>{
+  const open = document.getElementById('navLinks');
+  if(open.dataset.mob==='1'){
+    open.removeAttribute('style'); open.dataset.mob='0';
+  }else{
+    Object.assign(open.style,{
+      display:'flex',position:'absolute',top:'64px',left:'16px',right:'16px',
+      flexDirection:'column',gap:'4px',padding:'14px',
+      background:'rgba(12,13,22,.96)',border:'1px solid rgba(255,255,255,.14)',
+      borderRadius:'20px',backdropFilter:'blur(24px)',WebkitBackdropFilter:'blur(24px)',
+      boxShadow:'0 24px 60px -20px rgba(0,0,0,.9)'
+    });
+    open.dataset.mob='1';
+  }
+});
+document.getElementById('navLinks').addEventListener('click',e=>{
+  if(e.target.tagName==='A' && window.innerWidth<=768){
+    const l = document.getElementById('navLinks');
+    l.removeAttribute('style'); l.dataset.mob='0';
+  }
+});
+
+/* ============================================================
+   7. 光標光暈
+   ============================================================ */
+const glow = document.getElementById('cursor-glow');
+let gx=innerWidth/2, gy=innerHeight/2, cx=gx, cy=gy;
+window.addEventListener('mousemove',e=>{ gx=e.clientX; gy=e.clientY; });
+(function loop(){
+  cx += (gx-cx)*0.09;
+  cy += (gy-cy)*0.09;
+  glow.style.transform = `translate(${cx}px,${cy}px) translate(-50%,-50%)`;
+  requestAnimationFrame(loop);
+})();
+
+/* ============================================================
+   8. Hero 預覽 3D 傾斜 + 視差
+   ============================================================ */
+const preview = document.getElementById('preview');
+const hero = document.querySelector('.hero');
+if(window.matchMedia('(hover:hover)').matches){
+  hero.addEventListener('mousemove',e=>{
+    const r = preview.getBoundingClientRect();
+    const px = (e.clientX - (r.left+r.width/2)) / r.width;
+    const py = (e.clientY - (r.top+r.height/2)) / r.height;
+    preview.style.transform =
+      `rotateY(${px*9}deg) rotateX(${-py*7}deg) translateZ(0)`;
+  });
+  hero.addEventListener('mouseleave',()=>{
+    preview.style.transform = 'rotateY(0) rotateX(0)';
+  });
+}
+
+/* ============================================================
+   9. 預覽面板開關自動律動
+   ============================================================ */
+(function previewPulse(){
+  const rows = document.querySelectorAll('#pvBody .pv-row[data-sync]');
+  let i = 0;
+  setInterval(()=>{
+    if(!rows.length) return;
+    const r = rows[i % rows.length];
+    r.classList.toggle('on');
+    i++;
+  }, 1400);
+})();
+
+/* ============================================================
+   10. 倒數計時（72 小時，以當日 0 點為基準滾動）
+   ============================================================ */
+(function countdown(){
+  const KEY = 'yli_promo_deadline';
+  let deadline = parseInt(localStorage.getItem(KEY)||'0',10);
+  if(!deadline || deadline < Date.now()){
+    deadline = Date.now() + 72*3600*1000;
+    try{ localStorage.setItem(KEY,String(deadline)); }catch(e){}
+  }
+  const hEl=document.getElementById('cd-h'), mEl=document.getElementById('cd-m'), sEl=document.getElementById('cd-s');
+  function pad(n){ return String(n).padStart(2,'0'); }
+  function tick(){
+    let d = Math.max(0, deadline - Date.now());
+    const h = Math.floor(d/3600000);
+    const m = Math.floor(d%3600000/60000);
+    const s = Math.floor(d%60000/1000);
+    hEl.textContent = pad(h); mEl.textContent = pad(m); sEl.textContent = pad(s);
+    if(d<=0){ try{ localStorage.removeItem(KEY); }catch(e){} deadline = Date.now()+72*3600*1000; }
+  }
+  tick();
+  setInterval(tick,1000);
+})();
+
+/* ============================================================
+   11. 優惠碼複製
+   ============================================================ */
+const coupon = document.getElementById('couponCode');
+coupon.addEventListener('click',async()=>{
+  const code = coupon.textContent.trim();
+  try{
+    await navigator.clipboard.writeText(code);
+  }catch(e){
+    const ta=document.createElement('textarea');
+    ta.value=code; document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); }catch(_){}
+    ta.remove();
+  }
+  const old = coupon.textContent;
+  coupon.classList.add('copied');
+  coupon.textContent = '已複製 ✓';
+  setTimeout(()=>{ coupon.classList.remove('copied'); coupon.textContent = old; },1500);
+});
+
+/* ============================================================
+   12. 免費取得按鈕回饋
+   ============================================================ */
+const freeBtn = document.getElementById('freeBtn');
+if(freeBtn){
+  freeBtn.addEventListener('click',e=>{
+    e.preventDefault();
+    const old = freeBtn.innerHTML;
+    freeBtn.innerHTML = '正在前往下載…';
+    freeBtn.style.pointerEvents = 'none';
+    setTimeout(()=>{ freeBtn.innerHTML = old; freeBtn.style.pointerEvents = ''; },1500);
+  });
+}
+
+/* ============================================================
+   12b. 連擊計數動畫
+   ============================================================ */
+(function comboCounter(){
+  const el = document.getElementById('comboNum'); if(!el) return;
+  let n = 17;
+  setInterval(()=>{
+    n = n>=99 ? 17 : n + Math.ceil(Math.random()*3);
+    el.textContent = '× ' + n;
+  },380);
+})();
+
+/* ============================================================
+   12c. Hero 上升粒子
+   ============================================================ */
+(function particles(){
+  const box = document.getElementById('particles'); if(!box) return;
+  for(let i=0;i<22;i++){
+    const s = document.createElement('i');
+    const size = (2+Math.random()*4.5).toFixed(1);
+    s.style.width = s.style.height = size+'px';
+    s.style.left = (Math.random()*100).toFixed(1)+'%';
+    s.style.animationDuration = (9+Math.random()*13).toFixed(1)+'s';
+    s.style.animationDelay = (-Math.random()*18).toFixed(1)+'s';
+    box.appendChild(s);
+  }
+})();
+
+/* ============================================================
+   13. 磁吸主按鈕
+   ============================================================ */
+const magnet = document.getElementById('magnetBtn');
+if(window.matchMedia('(hover:hover)').matches){
+  magnet.addEventListener('mousemove',e=>{
+    const r = magnet.getBoundingClientRect();
+    const dx = (e.clientX-(r.left+r.width/2))/r.width;
+    const dy = (e.clientY-(r.top+r.height/2))/r.height;
+    magnet.style.transform = `translate(${dx*7}px, ${dy*5-3}px) scale(1.03)`;
+  });
+  magnet.addEventListener('mouseleave',()=>{ magnet.style.transform=''; });
+}
+
+/* ============================================================
+   14. 線上人數微幅波動
+   ============================================================ */
+(function onlineFloat(){
+  const el = document.getElementById('onlineNow');
+  let base = 3271;
+  setInterval(()=>{
+    base += Math.round((Math.random()-0.48)*14);
+    if(base<3100) base=3100;
+    if(base>3480) base=3480;
+    el.textContent = base.toLocaleString('en-US');
+  },2600);
+})();
+
+/* ============================================================
+   15. 平滑錨點（含導覽列高度補償）
+   ============================================================ */
+document.querySelectorAll('a[href^="#"]').forEach(a=>{
+  a.addEventListener('click',e=>{
+    const id = a.getAttribute('href');
+    if(id==='#' || id.length<2) return;
+    const el = document.querySelector(id);
+    if(!el) return;
+    e.preventDefault();
+    const top = el.getBoundingClientRect().top + window.scrollY - 72;
+    window.scrollTo({top, behavior:'smooth'});
+  });
+});
+
+console.log('%c厭璃 YLI × Specter Hub','background:linear-gradient(90deg,#8b5cff,#31e2f5);color:#fff;padding:6px 14px;border-radius:6px;font-weight:700', '\npower by 可軒');
+</script>
+</body>
+</html>
